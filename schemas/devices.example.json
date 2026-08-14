@@ -1,0 +1,22 @@
+{
+  "devices": [
+    {
+      "mac": "AA:BB:CC:DD:EE:FF",
+      "name": "Sebastian iPhone 14 Pro",
+      "type": "smartphone",
+      "manufacturer": "Apple Inc.",
+      "model": "iPhone 14 Pro",
+      "disabled": false,
+      "notes": "Primary device for Sebastian"
+    },
+    {
+      "mac": "11:22:33:44:55:66",
+      "name": "Sebastian MacBook",
+      "type": "laptop",
+      "manufacturer": "Apple Inc.",
+      "model": "MacBook Pro",
+      "disabled": false,
+      "notes": "Secondary device for Sebastian"
+    }
+  ]
+}
