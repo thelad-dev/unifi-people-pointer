@@ -1,4 +1,5 @@
 """Constants for the UniFi People Pointer integration."""
+from datetime import timedelta
 
 DOMAIN = "unifi_people_pointer"
 
@@ -36,11 +37,37 @@ MAX_GRACE_PERIOD = 1800
 MIN_EVENT_DEBOUNCE = 0
 MAX_EVENT_DEBOUNCE = 600
 
+# Update intervals
+MIN_POLL_INTERVAL_DELTA = timedelta(seconds=MIN_POLL_INTERVAL)
+DEFAULT_UPDATE_INTERVAL = timedelta(seconds=DEFAULT_POLL_INTERVAL)
+
+# Device Types
+DEVICE_TYPE_PRIMARY = "primary"
+DEVICE_TYPE_SECONDARY = "secondary"
+
 # Events
 EVENT_PERSON_ARRIVED = "unifi_people_pointer_person_arrived"
 EVENT_PERSON_LEFT = "unifi_people_pointer_person_left"
 EVENT_DEVICE_CONNECTED = "unifi_people_pointer_device_connected"
 EVENT_UNKNOWN_DEVICE = "unifi_people_pointer_unknown_device"
+
+# Services
+SERVICE_ASSIGN_DEVICE = "assign_device"
+SERVICE_TRACK_DEVICE = "track_device"
+SERVICE_REMOVE_DEVICE = "remove_device"
+SERVICE_SCAN_NOW = "scan_now"
+SERVICE_FORCE_UPDATE_PERSON = "force_update_person"
+SERVICE_CLAIM_UNKNOWN_DEVICE = "claim_unknown_device"
+
+# Fallback Sources
+FALLBACK_UNIFI = "unifi"
+FALLBACK_MOBILE_APP = "mobile_app"
+FALLBACK_PING = "ping"
+
+# States
+STATE_HOME = "home"
+STATE_AWAY = "away"
+STATE_UNKNOWN = "unknown"
 
 # Storage
 STORAGE_DIR = "unifi_people_pointer"
