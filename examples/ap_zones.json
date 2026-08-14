@@ -1,0 +1,17 @@
+{
+  "ap-living-room": {
+    "name": "Living Room",
+    "zone": "home.living_room",
+    "mac": "00:11:22:33:44:55"
+  },
+  "ap-bedroom": {
+    "name": "Bedroom",
+    "zone": "home.bedroom",
+    "mac": "00:11:22:33:44:66"
+  },
+  "ap-office": {
+    "name": "Office",
+    "zone": "home.office",
+    "mac": "00:11:22:33:44:77"
+  }
+}
