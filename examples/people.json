@@ -1,0 +1,18 @@
+{
+  "sebastian": {
+    "name": "Sebastian",
+    "icon": "mdi:account",
+    "devices": {
+      "primary": ["AA:BB:CC:DD:EE:FF"],
+      "secondary": ["11:22:33:44:55:66", "77:88:99:AA:BB:CC"]
+    }
+  },
+  "maria": {
+    "name": "Maria",
+    "icon": "mdi:account-circle",
+    "devices": {
+      "primary": ["12:34:56:78:90:AB"],
+      "secondary": ["AB:CD:EF:12:34:56"]
+    }
+  }
+}
