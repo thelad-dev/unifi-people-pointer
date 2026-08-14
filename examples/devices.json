@@ -1,0 +1,21 @@
+{
+  "AA:BB:CC:DD:EE:FF": {
+    "name": "Sebastian iPhone",
+    "hostname_pattern": "sebastians?-iphone",
+    "type": "smartphone",
+    "manufacturer": "Apple",
+    "notes": "Primary phone with private MAC"
+  },
+  "11:22:33:44:55:66": {
+    "name": "Sebastian MacBook",
+    "hostname_pattern": "sebastians?-macbook",
+    "type": "laptop",
+    "manufacturer": "Apple"
+  },
+  "12:34:56:78:90:AB": {
+    "name": "Maria Android",
+    "hostname_pattern": "maria-.*",
+    "type": "smartphone",
+    "manufacturer": "Samsung"
+  }
+}
