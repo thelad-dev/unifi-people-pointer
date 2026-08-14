@@ -1,0 +1,16 @@
+{
+  "domain": "unifi_people_pointer",
+  "name": "UniFi People Pointer",
+  "codeowners": ["@thelad-dev"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/thelad-dev/unifi-people-pointer",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/thelad-dev/unifi-people-pointer/issues",
+  "requirements": [
+    "aiounifi>=70.0.0",
+    "aiohttp>=3.8.0",
+    "icmplib>=3.0.0"
+  ],
+  "version": "1.0.0"
+}
