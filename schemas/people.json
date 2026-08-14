@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "description": "People configuration for UniFi People Pointer",
+  "properties": {
+    "people": {
+      "type": "array",
+      "description": "List of people to track",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique person ID (slug)",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name",
+            "minLength": 1
+          },
+          "primary_device": {
+            "type": "string",
+            "description": "MAC Address of primary device (required for 'home' state)",
+            "pattern": "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+          },
+          "secondary_devices": {
+            "type": "array",
+            "description": "List of secondary device MAC addresses",
+            "items": {
+              "type": "string",
+              "pattern": "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+            },
+            "default": []
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable/disable tracking for this person",
+            "default": true
+          },
+          "mobile_app_entity": {
+            "type": "string",
+            "description": "HA Mobile App entity_id for GPS fallback (e.g., device_tracker.person_phone)",
+            "pattern": "^device_tracker\\.[a-z0-9_]+$"
+          }
+        },
+        "required": ["id", "name", "primary_device"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["people"]
+}

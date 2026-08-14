@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "description": "Device registry for UniFi People Pointer",
+  "properties": {
+    "devices": {
+      "type": "array",
+      "description": "List of registered devices",
+      "items": {
+        "type": "object",
+        "properties": {
+          "mac": {
+            "type": "string",
+            "description": "MAC Address (unique identifier)",
+            "pattern": "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Friendly device name",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "description": "Device type",
+            "enum": ["smartphone", "laptop", "tablet", "desktop", "iot", "other"]
+          },
+          "manufacturer": {
+            "type": "string",
+            "description": "Device manufacturer (from OUI or custom)"
+          },
+          "model": {
+            "type": "string",
+            "description": "Device model"
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Disable tracking for this device",
+            "default": false
+          },
+          "notes": {
+            "type": "string",
+            "description": "User notes"
+          }
+        },
+        "required": ["mac", "name"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["devices"]
+}
