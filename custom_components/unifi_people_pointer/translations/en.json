@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "UniFi People Pointer Setup",
+        "description": "Set up UniFi People Pointer for person-based presence tracking",
+        "data": {
+          "host": "UniFi Controller URL",
+          "api_key": "API Key",
+          "site_id": "Site ID",
+          "verify_ssl": "Verify SSL Certificate"
+        }
+      },
+      "unifi": {
+        "title": "Connect to UniFi Network",
+        "description": "Enter your UniFi Controller details",
+        "data": {
+          "host": "UniFi Controller URL",
+          "api_key": "API Key",
+          "site_id": "Site ID",
+          "verify_ssl": "Verify SSL Certificate"
+        }
+      },
+      "polling": {
+        "title": "Configure Polling & Fallback",
+        "description": "Configure how often to poll and fallback behavior",
+        "data": {
+          "poll_interval": "Poll Interval (seconds)",
+          "grace_period": "Grace Period (seconds)",
+          "enable_mobile_app_fallback": "Enable Mobile App Fallback",
+          "enable_ping_fallback": "Enable Ping Fallback",
+          "event_debounce": "Event Debounce (seconds)"
+        }
+      },
+      "oui": {
+        "title": "OUI Database Auto-Update",
+        "description": "Configure automatic manufacturer database updates",
+        "data": {
+          "enable_oui_update": "Enable OUI Auto-Update",
+          "oui_update_interval": "Update Interval",
+          "oui_source": "OUI Source URL"
+        },
+        "data_description": {
+          "oui_update_interval": "How often to update the manufacturer database"
+        }
+      }
+    },
+    "error": {
+      "invalid_url": "Invalid URL format. Must start with http:// or https://",
+      "invalid_auth": "Invalid API Key. Check Settings → Admins → API Token",
+      "cannot_connect": "Cannot connect to UniFi Controller. Check URL and network",
+      "unknown": "Unknown error occurred. Check logs for details",
+      "must_be_greater_than_poll": "Grace Period must be >= Poll Interval",
+      "unreachable": "Cannot reach OUI source URL. Check network or use default"
+    },
+    "abort": {
+      "already_configured": "UniFi People Pointer is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "UniFi People Pointer Options",
+        "description": "Configure polling and fallback settings",
+        "data": {
+          "poll_interval": "Poll Interval (seconds)",
+          "grace_period": "Grace Period (seconds)",
+          "enable_mobile_app_fallback": "Enable Mobile App Fallback",
+          "enable_ping_fallback": "Enable Ping Fallback",
+          "event_debounce": "Event Debounce (seconds)",
+          "enable_oui_update": "Enable OUI Auto-Update",
+          "oui_update_interval": "Update Interval"
+        }
+      }
+    }
+  }
+}
