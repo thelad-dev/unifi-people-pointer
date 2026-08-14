@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: unifi-people-pointer-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HA_URL=${HA_URL:-http://homeassistant.local:8123}
+      - HA_TOKEN=${HA_TOKEN}
+      - UNIFI_URL=${UNIFI_URL}
+      - UNIFI_API_KEY=${UNIFI_API_KEY}
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+    networks:
+      - unifi-people-pointer
+
+  # Optional: Frontend (when implemented)
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: unifi-people-pointer-frontend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8080:80"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - unifi-people-pointer
+
+networks:
+  unifi-people-pointer:
+    driver: bridge

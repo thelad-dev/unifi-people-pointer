@@ -1,0 +1,143 @@
+# Services for UniFi People Pointer
+
+assign_device:
+  name: Assign Device to Person
+  description: Assign a device (by MAC address) to a person as primary or secondary device
+  fields:
+    mac:
+      name: MAC Address
+      description: Device MAC address (format AA:BB:CC:DD:EE:FF)
+      required: true
+      example: "AA:BB:CC:DD:EE:FF"
+      selector:
+        text:
+    person:
+      name: Person ID
+      description: Person identifier (slug)
+      required: true
+      example: "sebastian"
+      selector:
+        text:
+    device_type:
+      name: Device Type
+      description: Primary or secondary device
+      required: true
+      default: "secondary"
+      selector:
+        select:
+          options:
+            - "primary"
+            - "secondary"
+    device_name:
+      name: Device Name
+      description: Friendly name for the device
+      required: false
+      example: "Sebastian iPhone"
+      selector:
+        text:
+
+track_device:
+  name: Track Device
+  description: Start tracking a device (adds it to devices.json and enables tracking)
+  fields:
+    mac:
+      name: MAC Address
+      description: Device MAC address
+      required: true
+      example: "AA:BB:CC:DD:EE:FF"
+      selector:
+        text:
+    name:
+      name: Device Name
+      description: Friendly name for the device
+      required: true
+      example: "Living Room iPad"
+      selector:
+        text:
+    device_type:
+      name: Device Type
+      description: Type of device
+      required: false
+      default: "other"
+      selector:
+        select:
+          options:
+            - "smartphone"
+            - "laptop"
+            - "tablet"
+            - "desktop"
+            - "iot"
+            - "other"
+
+remove_device:
+  name: Remove Device
+  description: Stop tracking a device and remove it from person assignments
+  fields:
+    mac:
+      name: MAC Address
+      description: Device MAC address to remove
+      required: true
+      example: "AA:BB:CC:DD:EE:FF"
+      selector:
+        text:
+
+scan_now:
+  name: Scan Now
+  description: Trigger immediate scan of UniFi network for devices
+  fields:
+    target:
+      name: Target
+      description: Scan all devices or specific MAC address
+      required: false
+      default: "all"
+      example: "all"
+      selector:
+        text:
+
+force_update_person:
+  name: Force Update Person
+  description: Force immediate state update for a specific person
+  fields:
+    person:
+      name: Person ID
+      description: Person identifier to update
+      required: true
+      example: "sebastian"
+      selector:
+        text:
+
+claim_unknown_device:
+  name: Claim Unknown Device
+  description: Claim an unknown device and assign it to a person
+  fields:
+    mac:
+      name: MAC Address
+      description: Unknown device MAC address
+      required: true
+      example: "XX:XX:XX:XX:XX:XX"
+      selector:
+        text:
+    person:
+      name: Person ID
+      description: Person to assign device to
+      required: true
+      example: "sebastian"
+      selector:
+        text:
+    device_type:
+      name: Device Type
+      description: Primary or secondary device
+      required: true
+      default: "secondary"
+      selector:
+        select:
+          options:
+            - "primary"
+            - "secondary"
+    device_name:
+      name: Device Name
+      description: Friendly name for the device
+      required: false
+      example: "Sebastian iPad"
+      selector:
+        text:

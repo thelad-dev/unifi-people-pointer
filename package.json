@@ -1,0 +1,15 @@
+{
+  "name": "unifi-people-pointer",
+  "version": "1.0.0",
+  "description": "UniFi People Pointer - Track people via UniFi devices",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "dev": "docker-compose up",
+    "build": "cd frontend && npm run build && cd ../backend && npm run build",
+    "start": "docker-compose up -d"
+  },
+  "keywords": ["unifi", "home-assistant", "people-tracking"],
+  "author": "",
+  "license": "MIT"
+}
