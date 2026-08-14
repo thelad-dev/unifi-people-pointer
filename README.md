@@ -1,126 +1,261 @@
-# UniFi People Pointer
+# UniFi People Pointer 🎯
 
-Person-based presence tracking for Home Assistant using UniFi Network as the data source.
-
-## Overview
-
-UniFi People Pointer is a Home Assistant custom integration that tracks **people** (not just devices) based on their WiFi presence in a UniFi network. It supports:
-
-- **Multi-Device Tracking**: Track a person across primary and secondary devices
-- **3-Level Fallback**: UniFi → Mobile App → Ping with configurable grace period
-- **Unknown Device Detection**: Automatically detect and claim new devices
-- **Guest Network Tracking**: Separate tracking for guest WiFi clients
-- **Access Point Zones**: Map APs to Home Assistant zones for room-level presence
-
-## Status: Phase 1 - Core Foundation ✅
-
-This is the **Phase 1** release containing the core integration structure:
-
-### What's Included
-
-- ✅ **Integration Scaffold**: Full Home Assistant custom component structure
-- ✅ **Config Flow**: 3-step setup UI (UniFi Connection → Polling Settings → OUI Auto-Update)
-- ✅ **Manifest**: HACS-ready metadata with required dependencies
-- ✅ **Coordinator**: Data update coordinator for UniFi API polling
-- ✅ **Device Tracker Platform**: Person and Device tracker entities (structure ready)
-- ✅ **Sensor Platform**: Unknown Clients and Guest Clients sensors (structure ready)
-- ✅ **Constants**: All configuration constants and defaults
-- ✅ **Translations**: English language strings
-
-### What's Next (Phase 2+)
-
-- 🔲 **UniFi API Client**: Full implementation of UniFi Network API integration
-- 🔲 **Fallback Logic**: Mobile App GPS and Ping fallback implementation
-- 🔲 **Grace Period**: 10-minute grace period before marking person away
-- 🔲 **Event System**: Person arrived/left events with debouncing
-- 🔲 **JSON Storage**: People, devices, and zone configuration files
-- 🔲 **Services**: Add/remove person, claim device, scan now, etc.
-- 🔲 **OUI Manager**: Manufacturer database with auto-updates
-- 🔲 **Webapp**: React-based management interface
-
-See [Scout Report](data/unifi-people-pointer-scout-20260815/report.md) for complete design and roadmap.
-
-## Installation
-
-### HACS (Recommended)
-
-1. Add this repository as a custom repository in HACS
-2. Search for "UniFi People Pointer"
-3. Click Download
-4. Restart Home Assistant
-
-### Manual
-
-1. Copy `custom_components/unifi_people_pointer` to your `config/custom_components` directory
-2. Restart Home Assistant
-
-## Configuration
-
-1. Go to **Settings** → **Devices & Services**
-2. Click **+ Add Integration**
-3. Search for **UniFi People Pointer**
-4. Follow the 3-step setup:
-   - **Step 1**: Enter UniFi Controller URL and API Key
-   - **Step 2**: Configure polling interval and fallback settings
-   - **Step 3**: Configure OUI database auto-update
-
-## Architecture
-
-```
-custom_components/unifi_people_pointer/
-├── __init__.py              # Integration entry point
-├── config_flow.py           # 3-step config flow UI
-├── const.py                 # Constants and defaults
-├── coordinator.py           # Data update coordinator
-├── device_tracker.py        # Person/Device tracker entities
-├── sensor.py                # Unknown/Guest client sensors
-├── manifest.json            # Integration metadata
-├── strings.json             # Translation strings
-└── translations/
-    └── en.json              # English translations
-```
-
-## Requirements
-
-- Home Assistant 2024.1+
-- UniFi Network Controller with API access
-- Python 3.11+
-
-### Dependencies
-
-- `aiounifi>=70.0.0` - UniFi Network API client
-- `aiohttp>=3.8.0` - Async HTTP requests
-- `icmplib>=3.0.0` - Ping functionality
-
-## Development
-
-This integration follows Home Assistant development best practices:
-
-- **Config Flow**: UI-based configuration (no YAML)
-- **DataUpdateCoordinator**: Efficient polling with built-in retry logic
-- **Entity Platform**: Standard device_tracker and sensor platforms
-- **Async**: Fully async implementation
-- **Logging**: Comprehensive debug logging
-
-## Scout Report
-
-Full design documentation and implementation roadmap:
-- [Scout Report](data/unifi-people-pointer-scout-20260815/report.md)
-
-## License
-
-MIT License - See LICENSE file
-
-## Author
-
-Sebastian Ladwein ([@thelad-dev](https://github.com/thelad-dev))
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/thelad-dev/unifi-people-pointer/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/thelad-dev/unifi-people-pointer/discussions)
+[🇩🇪 Deutsch](#deutsch) | [🇬🇧 English](#english)
 
 ---
 
-**Version**: 0.1.0 (Phase 1 - Core Foundation)
-**Last Updated**: 2026-08-15
+## Deutsch
+
+### UniFi People Pointer - Personenbasierte Anwesenheitserkennung für Home Assistant
+
+UniFi People Pointer ist eine fortschrittliche Home Assistant Integration, die Personen statt einzelner Geräte trackt. Die Integration nutzt dein UniFi Netzwerk um intelligente Anwesenheitserkennung zu ermöglichen, selbst bei Geräten mit privaten/randomisierten MAC-Adressen.
+
+#### ✨ Hauptfunktionen
+
+- **Personenbasiertes Tracking**: Verfolge Menschen, nicht Geräte
+- **Multi-Device Support**: Eine Person kann mehrere Geräte (Smartphone, Laptop, Tablet, etc.) haben
+- **Private MAC Adressen**: Unterstützt iOS/Android Geräte mit wechselnden MAC-Adressen
+- **UniFi Native**: Direkte Integration mit UniFi Controller API
+- **Intelligente Events**: Automatische Benachrichtigungen bei Ankommen/Verlassen
+- **Unbekannte Geräte**: Warnung bei neuen Geräten im Netzwerk
+- **HACS Kompatibel**: Einfache Installation über Home Assistant Community Store
+- **Web-UI**: Optionales Web-Interface zur Verwaltung (in Entwicklung)
+
+#### 🚀 Installation
+
+##### Via HACS (empfohlen)
+
+1. Öffne HACS in Home Assistant
+2. Gehe zu "Integrationen"
+3. Klicke auf das `+` Icon
+4. Suche nach "UniFi People Pointer"
+5. Klicke auf "Installieren"
+6. Starte Home Assistant neu
+
+##### Manuell
+
+1. Lade die neueste Version von [Releases](https://github.com/thelad-dev/unifi-people-pointer/releases) herunter
+2. Entpacke `unifi_people_pointer` nach `/config/custom_components/`
+3. Starte Home Assistant neu
+
+#### ⚙️ Konfiguration
+
+1. Gehe zu **Einstellungen** → **Geräte & Dienste** → **Integration hinzufügen**
+2. Suche nach "UniFi People Pointer"
+3. Gib deine UniFi Controller Details ein:
+   - **Controller URL**: z.B. `https://192.168.1.1:8443`
+   - **API Key**: Erstelle einen unter Einstellungen → Admins → API Token
+   - **Site ID**: Normalerweise `default`
+
+4. Konfiguriere Polling & Fallback:
+   - **Poll Interval**: Wie oft nach Geräten gesucht wird (Standard: 45s)
+   - **Grace Period**: Wie lange gewartet wird bevor jemand als "weg" markiert wird (Standard: 10min)
+   - **Mobile App Fallback**: Nutze Home Assistant Mobile App als Backup
+   - **Ping Fallback**: Nutze ICMP Ping als zusätzliche Verifizierung
+
+#### 📱 Personen & Geräte einrichten
+
+Die Integration speichert Konfiguration in JSON-Dateien unter `/config/unifi_people_pointer/`:
+
+**people.json** - Definiere Personen:
+```json
+{
+  "sebastian": {
+    "name": "Sebastian",
+    "icon": "mdi:account",
+    "devices": {
+      "primary": ["AA:BB:CC:DD:EE:FF"],
+      "secondary": ["11:22:33:44:55:66", "77:88:99:AA:BB:CC"]
+    }
+  }
+}
+```
+
+**devices.json** - Verknüpfe Geräte mit Hostnamen (für private MACs):
+```json
+{
+  "AA:BB:CC:DD:EE:FF": {
+    "name": "Sebastian iPhone",
+    "hostname_pattern": "sebastians?-iphone",
+    "type": "smartphone",
+    "manufacturer": "Apple"
+  }
+}
+```
+
+#### 🎯 Services
+
+Die Integration bietet folgende Services:
+
+- `unifi_people_pointer.assign_device` - Gerät einer Person zuweisen
+- `unifi_people_pointer.track_device` - Neues Gerät tracken
+- `unifi_people_pointer.remove_device` - Gerät entfernen
+- `unifi_people_pointer.scan_now` - Sofortiges Netzwerk-Scan
+- `unifi_people_pointer.claim_unknown_device` - Unbekanntes Gerät beanspruchen
+
+#### 📊 Events
+
+- `unifi_people_pointer_person_arrived` - Person angekommen
+- `unifi_people_pointer_person_left` - Person gegangen
+- `unifi_people_pointer_device_connected` - Gerät verbunden
+- `unifi_people_pointer_unknown_device` - Unbekanntes Gerät entdeckt
+
+#### 🔧 Web-UI (Optional)
+
+Das Projekt enthält ein optionales Web-Interface zur einfacheren Verwaltung:
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+Das Interface läuft auf `http://localhost:3000` und bietet:
+- Personen & Geräte Verwaltung
+- Zonen-Konfiguration (Access Points)
+- OUI Datenbank Management
+- Live UniFi Client Monitoring
+
+#### 📋 Anforderungen
+
+- Home Assistant 2024.1.0 oder höher
+- UniFi Network Controller (Dream Machine, Cloud Key, selbst-gehostet)
+- Python 3.11+
+
+#### 🆘 Support
+
+- [GitHub Issues](https://github.com/thelad-dev/unifi-people-pointer/issues)
+- [Discussions](https://github.com/thelad-dev/unifi-people-pointer/discussions)
+
+#### 📄 Lizenz
+
+MIT License - siehe [LICENSE](LICENSE) für Details
+
+---
+
+## English
+
+### UniFi People Pointer - Person-based Presence Detection for Home Assistant
+
+UniFi People Pointer is an advanced Home Assistant integration that tracks people instead of individual devices. The integration uses your UniFi network to enable intelligent presence detection, even with devices using private/randomized MAC addresses.
+
+#### ✨ Key Features
+
+- **Person-based Tracking**: Track people, not devices
+- **Multi-Device Support**: One person can have multiple devices (smartphone, laptop, tablet, etc.)
+- **Private MAC Addresses**: Supports iOS/Android devices with rotating MAC addresses
+- **UniFi Native**: Direct integration with UniFi Controller API
+- **Smart Events**: Automatic notifications for arrivals/departures
+- **Unknown Devices**: Alerts for new devices on the network
+- **HACS Compatible**: Easy installation via Home Assistant Community Store
+- **Web UI**: Optional web interface for management (in development)
+
+#### 🚀 Installation
+
+##### Via HACS (recommended)
+
+1. Open HACS in Home Assistant
+2. Go to "Integrations"
+3. Click the `+` icon
+4. Search for "UniFi People Pointer"
+5. Click "Install"
+6. Restart Home Assistant
+
+##### Manual
+
+1. Download the latest version from [Releases](https://github.com/thelad-dev/unifi-people-pointer/releases)
+2. Extract `unifi_people_pointer` to `/config/custom_components/`
+3. Restart Home Assistant
+
+#### ⚙️ Configuration
+
+1. Go to **Settings** → **Devices & Services** → **Add Integration**
+2. Search for "UniFi People Pointer"
+3. Enter your UniFi Controller details:
+   - **Controller URL**: e.g., `https://192.168.1.1:8443`
+   - **API Key**: Create one under Settings → Admins → API Token
+   - **Site ID**: Usually `default`
+
+4. Configure Polling & Fallback:
+   - **Poll Interval**: How often to scan for devices (default: 45s)
+   - **Grace Period**: How long to wait before marking someone as "away" (default: 10min)
+   - **Mobile App Fallback**: Use Home Assistant Mobile App as backup
+   - **Ping Fallback**: Use ICMP ping as additional verification
+
+#### 📱 Setting up People & Devices
+
+The integration stores configuration in JSON files under `/config/unifi_people_pointer/`:
+
+**people.json** - Define people:
+```json
+{
+  "sebastian": {
+    "name": "Sebastian",
+    "icon": "mdi:account",
+    "devices": {
+      "primary": ["AA:BB:CC:DD:EE:FF"],
+      "secondary": ["11:22:33:44:55:66", "77:88:99:AA:BB:CC"]
+    }
+  }
+}
+```
+
+**devices.json** - Link devices with hostnames (for private MACs):
+```json
+{
+  "AA:BB:CC:DD:EE:FF": {
+    "name": "Sebastian iPhone",
+    "hostname_pattern": "sebastians?-iphone",
+    "type": "smartphone",
+    "manufacturer": "Apple"
+  }
+}
+```
+
+#### 🎯 Services
+
+The integration provides these services:
+
+- `unifi_people_pointer.assign_device` - Assign device to person
+- `unifi_people_pointer.track_device` - Track new device
+- `unifi_people_pointer.remove_device` - Remove device
+- `unifi_people_pointer.scan_now` - Immediate network scan
+- `unifi_people_pointer.claim_unknown_device` - Claim unknown device
+
+#### 📊 Events
+
+- `unifi_people_pointer_person_arrived` - Person arrived
+- `unifi_people_pointer_person_left` - Person left
+- `unifi_people_pointer_device_connected` - Device connected
+- `unifi_people_pointer_unknown_device` - Unknown device detected
+
+#### 🔧 Web UI (Optional)
+
+The project includes an optional web interface for easier management:
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+The interface runs on `http://localhost:3000` and offers:
+- People & Device Management
+- Zone Configuration (Access Points)
+- OUI Database Management
+- Live UniFi Client Monitoring
+
+#### 📋 Requirements
+
+- Home Assistant 2024.1.0 or higher
+- UniFi Network Controller (Dream Machine, Cloud Key, self-hosted)
+- Python 3.11+
+
+#### 🆘 Support
+
+- [GitHub Issues](https://github.com/thelad-dev/unifi-people-pointer/issues)
+- [Discussions](https://github.com/thelad-dev/unifi-people-pointer/discussions)
+
+#### 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details
