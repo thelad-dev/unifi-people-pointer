@@ -1,77 +1,108 @@
-"""The UniFi People Pointer integration."""
-from __future__ import annotations
-
-import asyncio
+"""UniFi People Pointer integration."""
 import logging
 from datetime import timedelta
-from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.exceptions import ConfigEntryNotReady
 
 from .const import (
+    DOMAIN,
     CONF_POLL_INTERVAL,
     DEFAULT_POLL_INTERVAL,
-    DOMAIN,
-    PLATFORMS,
-    STORAGE_DIR,
+    CONF_EVENT_DEBOUNCE,
+    DEFAULT_EVENT_DEBOUNCE,
 )
 from .coordinator import UniFiPeoplePointerCoordinator
+from .events import UniFiEventManager
+from .services import setup_services, unregister_services
+from .template_helpers import setup_template_helpers, unregister_template_helpers
 
 _LOGGER = logging.getLogger(__name__)
 
-
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the UniFi People Pointer component."""
-    hass.data.setdefault(DOMAIN, {})
-    return True
+PLATFORMS: list[Platform] = [
+    # Platform.DEVICE_TRACKER,
+    # Platform.SENSOR,
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up UniFi People Pointer from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
+    _LOGGER.info("Setting up UniFi People Pointer")
 
-    # Ensure storage directory exists
-    storage_path = Path(hass.config.path(STORAGE_DIR))
-    storage_path.mkdir(parents=True, exist_ok=True)
-    _LOGGER.info("Storage directory: %s", storage_path)
+    # Get config values
+    poll_interval = entry.options.get(
+        CONF_POLL_INTERVAL,
+        entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
+    )
+    event_debounce = entry.options.get(
+        CONF_EVENT_DEBOUNCE,
+        entry.data.get(CONF_EVENT_DEBOUNCE, DEFAULT_EVENT_DEBOUNCE),
+    )
 
-    # Initialize coordinator
-    poll_interval = entry.data.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
+    # Create coordinator
     coordinator = UniFiPeoplePointerCoordinator(
         hass,
-        entry,
         update_interval=timedelta(seconds=poll_interval),
     )
 
-    # Perform initial refresh
+    # Create event manager
+    event_manager = UniFiEventManager(hass, debounce_seconds=event_debounce)
+
+    # Store coordinator and event manager
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN] = {
+        "coordinator": coordinator,
+        "event_manager": event_manager,
+        "config_entry": entry,
+    }
+
+    # Fetch initial data
     await coordinator.async_config_entry_first_refresh()
 
-    # Store coordinator
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    # Set up platforms
+    if PLATFORMS:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Forward setup to platforms
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # Register services
+    setup_services(hass)
 
-    # Register update listener for options
-    entry.async_on_unload(entry.add_update_listener(async_update_options))
+    # Register template helpers
+    setup_template_helpers(hass)
 
-    _LOGGER.info("UniFi People Pointer integration setup complete")
+    _LOGGER.info("UniFi People Pointer setup complete")
+
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    _LOGGER.info("Unloading UniFi People Pointer")
 
+    # Unload platforms
+    unload_ok = True
+    if PLATFORMS:
+        unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    # Unregister services
+    unregister_services(hass)
+
+    # Unregister template helpers
+    unregister_template_helpers(hass)
+
+    # Remove data
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        hass.data[DOMAIN].pop("coordinator", None)
+        hass.data[DOMAIN].pop("event_manager", None)
+        hass.data[DOMAIN].pop("config_entry", None)
+
+    _LOGGER.info("UniFi People Pointer unloaded")
 
     return unload_ok
 
 
-async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Update options."""
-    await hass.config_entries.async_reload(entry.entry_id)
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload config entry."""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)

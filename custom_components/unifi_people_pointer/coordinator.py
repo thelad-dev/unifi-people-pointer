@@ -1,113 +1,182 @@
 """Data update coordinator for UniFi People Pointer."""
-from __future__ import annotations
-
-from datetime import datetime, timedelta
 import logging
+from datetime import timedelta
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import (
-    CONF_API_KEY,
-    CONF_HOST,
-    CONF_SITE_ID,
-    CONF_VERIFY_SSL,
-    DEFAULT_SITE_ID,
-    DEFAULT_VERIFY_SSL,
-    DOMAIN,
-)
+from .const import DOMAIN, DEFAULT_UPDATE_INTERVAL, STATE_HOME, STATE_AWAY
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class UniFiPeoplePointerCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching UniFi data."""
+    """Coordinator to manage UniFi People Pointer data updates."""
 
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: ConfigEntry,
-        update_interval: timedelta,
-    ) -> None:
-        """Initialize the coordinator."""
+        update_interval: timedelta = DEFAULT_UPDATE_INTERVAL,
+    ):
+        """Initialize coordinator."""
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
             update_interval=update_interval,
         )
-        self.entry = entry
-        self.config = entry.data
-        
-        # UniFi connection details
-        self.host = self.config[CONF_HOST]
-        self.api_key = self.config[CONF_API_KEY]
-        self.site_id = self.config.get(CONF_SITE_ID, DEFAULT_SITE_ID)
-        self.verify_ssl = self.config.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
-        
-        # Initialize data storage
-        self.clients: list[dict[str, Any]] = []
-        self.access_points: list[dict[str, Any]] = []
-        self.people_data: dict[str, Any] = {}
-        self.devices_data: dict[str, Any] = {}
-        
-        _LOGGER.info(
-            "Initialized coordinator for %s (poll interval: %s)",
-            self.host,
-            update_interval,
-        )
+        self._people: dict[str, dict] = {}
+        self._devices: dict[str, dict] = {}
+        self._unknown_devices: list[dict] = []
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch data from UniFi Controller."""
+        """Fetch data from UniFi."""
         try:
-            # TODO: Implement actual UniFi API client
-            # For now, return mock data structure
-            _LOGGER.debug("Fetching data from UniFi Controller: %s", self.host)
+            # Stub implementation - would normally fetch from UniFi API
+            _LOGGER.debug("Updating UniFi People Pointer data")
             
-            # Simulate API call delay
-            # await asyncio.sleep(0.1)
-            
-            # Mock data for initial structure
-            data = {
-                "clients": [],
-                "access_points": [],
-                "timestamp": datetime.now(),
+            return {
+                "people": self._people,
+                "devices": self._devices,
+                "unknown_devices": self._unknown_devices,
             }
-            
-            self.clients = data["clients"]
-            self.access_points = data["access_points"]
-            
-            _LOGGER.debug(
-                "Fetched %d clients and %d access points",
-                len(self.clients),
-                len(self.access_points),
-            )
-            
-            return data
-
         except Exception as err:
-            _LOGGER.error("Error communicating with UniFi Controller: %s", err)
-            raise UpdateFailed(f"Error communicating with API: {err}") from err
+            _LOGGER.error("Error updating data: %s", err)
+            raise UpdateFailed(f"Error communicating with UniFi: {err}") from err
 
-    async def async_get_client_by_mac(self, mac: str) -> dict[str, Any] | None:
-        """Get client by MAC address."""
-        for client in self.clients:
-            if client.get("mac", "").lower() == mac.lower():
-                return client
-        return None
+    # Service handler methods (stubs for now)
+    
+    async def assign_device(
+        self,
+        mac: str,
+        person: str,
+        device_type: str,
+        device_name: str | None = None,
+    ) -> None:
+        """Assign a device to a person."""
+        _LOGGER.info(
+            "Assigning device %s to person %s as %s (stub)",
+            mac,
+            person,
+            device_type,
+        )
+        # Stub: Would write to people.json and devices.json
+        if person not in self._people:
+            self._people[person] = {
+                "id": person,
+                "name": person.title(),
+                "primary_device": None,
+                "secondary_devices": [],
+            }
+        
+        if device_type == "primary":
+            self._people[person]["primary_device"] = mac
+        else:
+            if mac not in self._people[person]["secondary_devices"]:
+                self._people[person]["secondary_devices"].append(mac)
+        
+        await self.async_request_refresh()
 
-    async def async_get_access_point_by_mac(self, mac: str) -> dict[str, Any] | None:
-        """Get access point by MAC address."""
-        for ap in self.access_points:
-            if ap.get("mac", "").lower() == mac.lower():
-                return ap
-        return None
+    async def track_device(
+        self,
+        mac: str,
+        name: str,
+        device_type: str = "other",
+    ) -> None:
+        """Start tracking a device."""
+        _LOGGER.info("Tracking device %s as %s (stub)", mac, name)
+        # Stub: Would write to devices.json
+        self._devices[mac] = {
+            "mac": mac,
+            "name": name,
+            "type": device_type,
+            "connected": False,
+        }
+        await self.async_request_refresh()
 
-    def is_device_online(self, mac: str) -> bool:
-        """Check if device is currently online in UniFi."""
-        for client in self.clients:
-            if client.get("mac", "").lower() == mac.lower():
-                return True
-        return False
+    async def remove_device(self, mac: str) -> None:
+        """Remove a device from tracking."""
+        _LOGGER.info("Removing device %s (stub)", mac)
+        # Stub: Would remove from people.json and devices.json
+        self._devices.pop(mac, None)
+        
+        # Remove from people assignments
+        for person_data in self._people.values():
+            if person_data.get("primary_device") == mac:
+                person_data["primary_device"] = None
+            if mac in person_data.get("secondary_devices", []):
+                person_data["secondary_devices"].remove(mac)
+        
+        await self.async_request_refresh()
+
+    async def force_update_person(self, person: str) -> None:
+        """Force update a specific person's state."""
+        _LOGGER.info("Force updating person %s (stub)", person)
+        await self.async_request_refresh()
+
+    async def claim_unknown_device(
+        self,
+        mac: str,
+        person: str,
+        device_type: str,
+        device_name: str | None = None,
+    ) -> None:
+        """Claim an unknown device."""
+        _LOGGER.info(
+            "Claiming unknown device %s for person %s (stub)",
+            mac,
+            person,
+        )
+        # Stub: Would remove from unknown_devices and add to person
+        self._unknown_devices = [d for d in self._unknown_devices if d.get("mac") != mac]
+        
+        await self.assign_device(mac, person, device_type, device_name)
+
+    # Template helper methods (stubs for now)
+    
+    def get_person_state(self, person_id: str) -> str:
+        """Get state of a person."""
+        person_data = self._people.get(person_id)
+        if not person_data:
+            return STATE_AWAY
+        
+        # Stub: Would check actual device connection status
+        primary_device = person_data.get("primary_device")
+        if primary_device and self._devices.get(primary_device, {}).get("connected"):
+            return STATE_HOME
+        
+        return STATE_AWAY
+
+    def is_device_connected(self, mac: str) -> bool:
+        """Check if device is connected."""
+        device = self._devices.get(mac)
+        return device.get("connected", False) if device else False
+
+    def get_person_zone(self, person_id: str) -> str | None:
+        """Get current zone of a person."""
+        if self.get_person_state(person_id) != STATE_HOME:
+            return None
+        
+        # Stub: Would return actual zone from AP mapping
+        return "home"
+
+    def get_device_signal(self, mac: str) -> int | None:
+        """Get signal strength of a device."""
+        device = self._devices.get(mac)
+        if not device or not device.get("connected"):
+            return None
+        
+        # Stub: Would return actual signal from UniFi
+        return device.get("signal_strength")
+
+    def get_person_devices(self, person_id: str) -> dict[str, Any]:
+        """Get all devices for a person."""
+        person_data = self._people.get(person_id)
+        if not person_data:
+            return {"primary": None, "secondary": []}
+        
+        return {
+            "primary": person_data.get("primary_device"),
+            "secondary": person_data.get("secondary_devices", []),
+        }
