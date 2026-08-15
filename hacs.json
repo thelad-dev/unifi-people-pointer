@@ -1,6 +1,10 @@
 {
   "name": "UniFi People Pointer",
   "render_readme": true,
-  "domains": ["device_tracker", "sensor"],
-  "homeassistant": "2024.1.0"
+  "homeassistant": "2024.1.0",
+  "zip_release": false,
+  "filename": false,
+  "domains": ["device_tracker", "binary_sensor"],
+  "iot_class": "Local Polling",
+  "country": ["DE"]
 }
