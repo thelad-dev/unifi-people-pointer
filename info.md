@@ -1,69 +1,35 @@
 # UniFi People Pointer
 
-Track **people**, not devices! 🎯
+**Presence tracking via UniFi WiFi clients with mapping to Home Assistant persons.**
 
-## Why UniFi People Pointer?
+## Features
 
-Modern smartphones change their MAC addresses for privacy (iOS 14+, Android 10+). Traditional device trackers fail when your phone gets a new random MAC every few hours.
-
-**UniFi People Pointer solves this** by tracking the *person* through multiple devices and using hostname matching to handle MAC rotation.
-
-## Key Features
-
-✅ **Person-based tracking** - One person, multiple devices  
-✅ **Private MAC support** - Works with randomized MAC addresses  
-✅ **UniFi native** - Direct integration with UniFi Controller API  
-✅ **Smart events** - Arrival/departure automations  
-✅ **Unknown device alerts** - Get notified about new devices  
-✅ **HACS ready** - Easy installation and updates  
+- 🎯 **Precise presence tracking** via UniFi Network Integration API
+- 📱 **Multi-device support** – multiple devices per person
+- 🔀 **Private MAC addresses** – recognizes devices despite randomized MACs via hostname
+- 🏠 **Native HA integration** – direct mapping to `person.*` entities
+- 🔧 **Flexible configuration** – JSON-based device and person management
 
 ## Quick Start
 
-1. **Install** via HACS or manually
-2. **Add Integration** in Home Assistant
-3. **Connect** your UniFi Controller
-4. **Configure** people in `/config/unifi_people_pointer/people.json`
-5. **Automate** with events and services!
+1. **Install** via HACS
+2. **Create API token** in UniFi Controller (Settings → Admins → Add Admin → View Only)
+3. **Configure `.env`** with your API token
+4. **Edit `devices.json`** and `people.json`** to define your devices and persons
+5. **Restart Home Assistant**
+6. **Add integration** in Settings → Devices & Services
 
-## Example Automation
+## Documentation
 
-```yaml
-automation:
-  - alias: "Welcome Home"
-    trigger:
-      - platform: event
-        event_type: unifi_people_pointer_person_arrived
-        event_data:
-          person: john
-    action:
-      - service: light.turn_on
-        target:
-          entity_id: light.entrance
-      - service: notify.mobile_app
-        data:
-          message: "Welcome home, John!"
-```
-
-## Services
-
-- `assign_device` - Assign device to person
-- `track_device` - Start tracking a device
-- `remove_device` - Remove device
-- `scan_now` - Trigger immediate scan
-- `claim_unknown_device` - Claim unknown device
-
-## Requirements
-
-- Home Assistant 2024.1.0+
-- UniFi Network Controller
-- API access to controller
+- [Installation Guide](https://github.com/thelad-dev/unifi-people-pointer/blob/main/docs/installation.md)
+- [Configuration Reference](https://github.com/thelad-dev/unifi-people-pointer/blob/main/docs/configuration.md)
+- [Examples & Automations](https://github.com/thelad-dev/unifi-people-pointer/blob/main/docs/examples.md)
 
 ## Support
 
 - [GitHub Issues](https://github.com/thelad-dev/unifi-people-pointer/issues)
-- [Documentation](https://github.com/thelad-dev/unifi-people-pointer)
-- [Discussions](https://github.com/thelad-dev/unifi-people-pointer/discussions)
+- [Changelog](https://github.com/thelad-dev/unifi-people-pointer/blob/main/CHANGELOG.md)
 
 ---
 
-**Made with ❤️ for the Home Assistant community**
+**Note:** This integration requires a UniFi Network Controller (Cloud Gateway Ultra, Dream Machine, etc.) with API access.
