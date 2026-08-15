@@ -1,0 +1,16 @@
+# Testing dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-homeassistant-custom-component>=0.13.0
+pytest-timeout>=2.1.0
+
+# Home Assistant testing
+homeassistant>=2024.1.0
+
+# HTTP mocking
+aioresponses>=0.7.4
+pytest-aiohttp>=1.0.4
+
+# Fixtures and helpers
+freezegun>=1.2.2
