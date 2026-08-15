@@ -3,55 +3,13 @@
     "step": {
       "user": {
         "title": "UniFi People Pointer Setup",
-        "description": "Set up UniFi People Pointer for person-based presence tracking",
-        "data": {
-          "host": "UniFi Controller URL",
-          "api_key": "API Key",
-          "site_id": "Site ID",
-          "verify_ssl": "Verify SSL Certificate"
-        }
-      },
-      "unifi": {
-        "title": "Connect to UniFi Network",
-        "description": "Enter your UniFi Controller details",
-        "data": {
-          "host": "UniFi Controller URL",
-          "api_key": "API Key",
-          "site_id": "Site ID",
-          "verify_ssl": "Verify SSL Certificate"
-        }
-      },
-      "polling": {
-        "title": "Configure Polling & Fallback",
-        "description": "Configure how often to poll and fallback behavior",
-        "data": {
-          "poll_interval": "Poll Interval (seconds)",
-          "grace_period": "Grace Period (seconds)",
-          "enable_mobile_app_fallback": "Enable Mobile App Fallback",
-          "enable_ping_fallback": "Enable Ping Fallback",
-          "event_debounce": "Event Debounce (seconds)"
-        }
-      },
-      "oui": {
-        "title": "OUI Database Auto-Update",
-        "description": "Configure automatic manufacturer database updates",
-        "data": {
-          "enable_oui_update": "Enable OUI Auto-Update",
-          "oui_update_interval": "Update Interval",
-          "oui_source": "OUI Source URL"
-        },
-        "data_description": {
-          "oui_update_interval": "How often to update the manufacturer database"
-        }
+        "description": "Set up UniFi People Pointer for person-based presence tracking"
       }
     },
     "error": {
-      "invalid_url": "Invalid URL format. Must start with http:// or https://",
-      "invalid_auth": "Invalid API Key. Check Settings → Admins → API Token",
-      "cannot_connect": "Cannot connect to UniFi Controller. Check URL and network",
-      "unknown": "Unknown error occurred. Check logs for details",
-      "must_be_greater_than_poll": "Grace Period must be >= Poll Interval",
-      "unreachable": "Cannot reach OUI source URL. Check network or use default"
+      "cannot_connect": "Failed to connect to UniFi Controller",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error occurred"
     },
     "abort": {
       "already_configured": "UniFi People Pointer is already configured"
@@ -61,17 +19,41 @@
     "step": {
       "init": {
         "title": "UniFi People Pointer Options",
-        "description": "Configure polling and fallback settings",
+        "description": "Configure polling and event settings",
         "data": {
           "poll_interval": "Poll Interval (seconds)",
           "grace_period": "Grace Period (seconds)",
-          "enable_mobile_app_fallback": "Enable Mobile App Fallback",
-          "enable_ping_fallback": "Enable Ping Fallback",
           "event_debounce": "Event Debounce (seconds)",
-          "enable_oui_update": "Enable OUI Auto-Update",
-          "oui_update_interval": "Update Interval"
+          "enable_mobile_app_fallback": "Enable Mobile App Fallback",
+          "enable_ping_fallback": "Enable Ping Fallback"
         }
       }
+    }
+  },
+  "services": {
+    "assign_device": {
+      "name": "Assign Device to Person",
+      "description": "Assign a device to a person as primary or secondary"
+    },
+    "track_device": {
+      "name": "Track Device",
+      "description": "Start tracking a device"
+    },
+    "remove_device": {
+      "name": "Remove Device",
+      "description": "Stop tracking a device"
+    },
+    "scan_now": {
+      "name": "Scan Now",
+      "description": "Trigger immediate UniFi network scan"
+    },
+    "force_update_person": {
+      "name": "Force Update Person",
+      "description": "Force immediate state update for a person"
+    },
+    "claim_unknown_device": {
+      "name": "Claim Unknown Device",
+      "description": "Claim an unknown device and assign to a person"
     }
   }
 }

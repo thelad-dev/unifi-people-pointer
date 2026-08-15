@@ -74,14 +74,10 @@ def setup_services(hass: HomeAssistant) -> None:
             device_type,
         )
 
-        # Get coordinator from first entry
-        if not hass.data.get(DOMAIN):
-            raise HomeAssistantError("UniFi People Pointer not initialized")
-        
-        entry_id = next(iter(hass.data[DOMAIN]))
-        coordinator = hass.data[DOMAIN][entry_id].get("coordinator")
+        # Get coordinator from hass.data
+        coordinator = hass.data[DOMAIN].get("coordinator")
         if not coordinator:
-            raise HomeAssistantError("UniFi People Pointer coordinator not found")
+            raise HomeAssistantError("UniFi People Pointer not initialized")
 
         try:
             await coordinator.assign_device(mac, person, device_type, device_name)
@@ -98,13 +94,9 @@ def setup_services(hass: HomeAssistant) -> None:
 
         _LOGGER.info("Starting to track device %s (%s)", mac, name)
 
-        if not hass.data.get(DOMAIN):
-            raise HomeAssistantError("UniFi People Pointer not initialized")
-        
-        entry_id = next(iter(hass.data[DOMAIN]))
-        coordinator = hass.data[DOMAIN][entry_id].get("coordinator")
+        coordinator = hass.data[DOMAIN].get("coordinator")
         if not coordinator:
-            raise HomeAssistantError("UniFi People Pointer coordinator not found")
+            raise HomeAssistantError("UniFi People Pointer not initialized")
 
         try:
             await coordinator.track_device(mac, name, device_type)
@@ -119,13 +111,9 @@ def setup_services(hass: HomeAssistant) -> None:
 
         _LOGGER.info("Removing device %s from tracking", mac)
 
-        if not hass.data.get(DOMAIN):
-            raise HomeAssistantError("UniFi People Pointer not initialized")
-        
-        entry_id = next(iter(hass.data[DOMAIN]))
-        coordinator = hass.data[DOMAIN][entry_id].get("coordinator")
+        coordinator = hass.data[DOMAIN].get("coordinator")
         if not coordinator:
-            raise HomeAssistantError("UniFi People Pointer coordinator not found")
+            raise HomeAssistantError("UniFi People Pointer not initialized")
 
         try:
             await coordinator.remove_device(mac)
@@ -140,13 +128,9 @@ def setup_services(hass: HomeAssistant) -> None:
 
         _LOGGER.info("Triggering immediate scan (target: %s)", target)
 
-        if not hass.data.get(DOMAIN):
-            raise HomeAssistantError("UniFi People Pointer not initialized")
-        
-        entry_id = next(iter(hass.data[DOMAIN]))
-        coordinator = hass.data[DOMAIN][entry_id].get("coordinator")
+        coordinator = hass.data[DOMAIN].get("coordinator")
         if not coordinator:
-            raise HomeAssistantError("UniFi People Pointer coordinator not found")
+            raise HomeAssistantError("UniFi People Pointer not initialized")
 
         try:
             await coordinator.async_request_refresh()
@@ -161,13 +145,9 @@ def setup_services(hass: HomeAssistant) -> None:
 
         _LOGGER.info("Forcing update for person %s", person)
 
-        if not hass.data.get(DOMAIN):
-            raise HomeAssistantError("UniFi People Pointer not initialized")
-        
-        entry_id = next(iter(hass.data[DOMAIN]))
-        coordinator = hass.data[DOMAIN][entry_id].get("coordinator")
+        coordinator = hass.data[DOMAIN].get("coordinator")
         if not coordinator:
-            raise HomeAssistantError("UniFi People Pointer coordinator not found")
+            raise HomeAssistantError("UniFi People Pointer not initialized")
 
         try:
             await coordinator.force_update_person(person)
@@ -190,13 +170,9 @@ def setup_services(hass: HomeAssistant) -> None:
             device_type,
         )
 
-        if not hass.data.get(DOMAIN):
-            raise HomeAssistantError("UniFi People Pointer not initialized")
-        
-        entry_id = next(iter(hass.data[DOMAIN]))
-        coordinator = hass.data[DOMAIN][entry_id].get("coordinator")
+        coordinator = hass.data[DOMAIN].get("coordinator")
         if not coordinator:
-            raise HomeAssistantError("UniFi People Pointer coordinator not found")
+            raise HomeAssistantError("UniFi People Pointer not initialized")
 
         try:
             await coordinator.claim_unknown_device(mac, person, device_type, device_name)
