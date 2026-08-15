@@ -1,58 +1,75 @@
-import { Router } from 'express';
-import { haClient } from '../services/homeassistant';
+import axios, { AxiosInstance } from 'axios';
+import { storage } from '../storage';
 
-const router = Router();
+class HomeAssistantClient {
+  private client: AxiosInstance | null = null;
 
-// Get HA connection status
-router.get('/status', async (req, res) => {
-  try {
-    const status = await haClient.getStatus();
-    res.json(status);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to connect to Home Assistant' });
+  private getClient(): AxiosInstance {
+    const haUrl = storage.getSetting('haUrl');
+    const haToken = storage.getSetting('haToken');
+
+    if (!haUrl || !haToken) {
+      throw new Error('Home Assistant URL and token must be configured');
+    }
+
+    if (!this.client) {
+      this.client = axios.create({
+        baseURL: haUrl,
+        headers: {
+          'Authorization': `Bearer ${haToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+
+    return this.client;
   }
-});
 
-// Get person entities from HA
-router.get('/persons', async (req, res) => {
-  try {
-    const persons = await haClient.getPersons();
-    res.json(persons);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch persons from Home Assistant' });
+  async getStatus() {
+    const client = this.getClient();
+    const response = await client.get('/api/');
+    return {
+      connected: true,
+      version: response.data.version,
+      message: response.data.message,
+    };
   }
-});
 
-// Update person location in HA
-router.post('/persons/:personId/location', async (req, res) => {
-  try {
-    const { zone } = req.body;
-    await haClient.updatePersonLocation(req.params.personId, zone);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update person location' });
+  async getPersons() {
+    const client = this.getClient();
+    const response = await client.get('/api/states');
+    const persons = response.data.filter((entity: any) => 
+      entity.entity_id.startsWith('person.')
+    );
+    return persons;
   }
-});
 
-// Get device tracker entities from HA
-router.get('/device-trackers', async (req, res) => {
-  try {
-    const trackers = await haClient.getDeviceTrackers();
-    res.json(trackers);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch device trackers' });
+  async updatePersonLocation(personId: string, zone: string) {
+    const client = this.getClient();
+    await client.post('/api/services/device_tracker/see', {
+      dev_id: personId,
+      location_name: zone,
+    });
   }
-});
 
-// Send event to HA
-router.post('/events', async (req, res) => {
-  try {
-    const { eventType, data } = req.body;
-    await haClient.sendEvent(eventType, data);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to send event to Home Assistant' });
+  async getDeviceTrackers() {
+    const client = this.getClient();
+    const response = await client.get('/api/states');
+    const trackers = response.data.filter((entity: any) => 
+      entity.entity_id.startsWith('device_tracker.')
+    );
+    return trackers;
   }
-});
 
-export default router;
+  async sendEvent(eventType: string, data: any) {
+    const client = this.getClient();
+    await client.post(`/api/events/${eventType}`, data);
+  }
+
+  async callService(domain: string, service: string, data: any) {
+    const client = this.getClient();
+    await client.post(`/api/services/${domain}/${service}`, data);
+  }
+}
+
+export const haClient = new HomeAssistantClient();
