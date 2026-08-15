@@ -4,104 +4,153 @@ Thank you for your interest in contributing! 🎉
 
 ## How to Contribute
 
-### Reporting Bugs
+### Reporting Issues
 
-1. Check if the bug is already reported in [Issues](https://github.com/thelad-dev/unifi-people-pointer/issues)
-2. If not, create a new issue with:
-   - Clear title
-   - Steps to reproduce
-   - Expected vs actual behavior
-   - Your environment (HA version, UniFi controller type, etc.)
-   - Relevant logs (from Home Assistant)
+- **Check existing issues** first to avoid duplicates
+- **Use a clear title** that describes the problem
+- **Include details:**
+  - Home Assistant version
+  - UniFi Controller model and firmware
+  - Integration version
+  - Relevant logs (Settings → System → Logs)
+  - Configuration snippet (sanitize sensitive data!)
 
 ### Suggesting Features
 
-1. Check [Discussions](https://github.com/thelad-dev/unifi-people-pointer/discussions) first
-2. Open a new Discussion or Issue describing:
-   - Use case
-   - Why it's needed
-   - How it should work
+- **Search existing feature requests** first
+- **Describe the use case** – why is this feature needed?
+- **Provide examples** of how it would work
+- **Consider alternatives** you've already explored
 
-### Code Contributions
+### Pull Requests
 
-#### Setup Development Environment
+1. **Fork the repository** and create a branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-1. Fork the repository
-2. Clone your fork
-3. Create a feature branch: `git checkout -b feature/my-feature`
+2. **Make your changes:**
+   - Follow existing code style
+   - Add/update tests if applicable
+   - Update documentation (README, docs/)
+   - Update CHANGELOG.md
 
-#### For Home Assistant Integration
+3. **Test thoroughly:**
+   - Test with your own UniFi setup
+   - Check for regressions
+   - Validate JSON schemas
+
+4. **Commit with clear messages:**
+   ```bash
+   git commit -m "feat: add support for multiple UniFi sites"
+   git commit -m "fix: handle missing hostname gracefully"
+   git commit -m "docs: update configuration examples"
+   ```
+
+5. **Push and create PR:**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+   - Use a clear PR title and description
+   - Reference related issues (#123)
+   - Include testing steps
+
+## Development Setup
+
+### Prerequisites
+
+- Python 3.11+
+- Home Assistant development environment
+- UniFi Network Controller (for testing)
+
+### Local Development
+
+1. **Clone repository:**
+   ```bash
+   git clone https://github.com/thelad-dev/unifi-people-pointer.git
+   cd unifi-people-pointer
+   ```
+
+2. **Create virtual environment:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   # or
+   venv\Scripts\activate  # Windows
+   ```
+
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements_dev.txt
+   ```
+
+4. **Configure `.env`:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your UniFi API token
+   ```
+
+5. **Link to HA config:**
+   ```bash
+   ln -s $(pwd) /config/custom_components/unifi_people_pointer
+   ```
+
+6. **Restart Home Assistant**
+
+### Testing
 
 ```bash
-# Link to HA config directory for testing
-ln -s $(pwd)/custom_components/unifi_people_pointer ~/.homeassistant/custom_components/
+# Run tests
+pytest
 
-# Restart Home Assistant
-# Test your changes
+# Check code style
+black --check .
+flake8 .
+
+# Type checking
+mypy .
 ```
-
-#### For Backend
-
-```bash
-cd backend
-npm install
-cp .env.example .env
-# Edit .env with your settings
-npm run dev
-```
-
-#### Code Style
-
-- **Python**: Follow PEP 8, use `black` for formatting
-- **TypeScript**: Follow ESLint rules
-- **Commits**: Use conventional commits (feat:, fix:, docs:, etc.)
-
-#### Testing
-
-- Test manually in Home Assistant
-- Verify services work via Developer Tools
-- Check logs for errors
-- Test with both real and mock UniFi data
-
-#### Pull Request Process
-
-1. Update README.md if needed
-2. Update CHANGELOG.md under `[Unreleased]`
-3. Ensure your code works with current HA stable
-4. Create PR with clear description
-5. Link related issues
-6. Wait for review
 
 ### Documentation
 
-Help improve docs by:
-- Fixing typos
-- Adding examples
-- Translating (we support DE/EN)
-- Writing guides
+- **Use bilingual format** (German/English) for user-facing docs
+- **Update examples** when changing functionality
+- **Keep CHANGELOG.md** up to date
+- **Test documentation links** before submitting
 
-## Development Roadmap
+## Code Style
 
-See [Issues](https://github.com/thelad-dev/unifi-people-pointer/issues) for planned features.
+- **Python:** Follow [PEP 8](https://pep8.org/)
+- **Use type hints** where applicable
+- **Add docstrings** to functions and classes
+- **Keep functions focused** – one responsibility per function
+- **JSON:** Use 2-space indentation, trailing commas
 
-**Priority for v1.1.0:**
-- Device Tracker platform implementation
-- Sensor platform
-- Frontend UI
+## Commit Message Format
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+- `feat:` New feature
+- `fix:` Bug fix
+- `docs:` Documentation only
+- `style:` Code style (formatting, no logic change)
+- `refactor:` Code restructuring (no functional change)
+- `test:` Adding or updating tests
+- `chore:` Maintenance tasks
+
+**Examples:**
+```
+feat: add zone-based presence detection
+fix: handle devices with empty hostname
+docs: add troubleshooting section to README
+```
 
 ## Questions?
 
-- [GitHub Discussions](https://github.com/thelad-dev/unifi-people-pointer/discussions)
-- [Issues](https://github.com/thelad-dev/unifi-people-pointer/issues)
-
-## Code of Conduct
-
-Be respectful, constructive, and helpful. We're all here to make this project better!
+Feel free to:
+- Open a [Discussion](https://github.com/thelad-dev/unifi-people-pointer/discussions)
+- Ask in [Issues](https://github.com/thelad-dev/unifi-people-pointer/issues)
 
 ## License
 
-By contributing, you agree your contributions will be licensed under the MIT License.
-
----
-
-Thank you for contributing! 🙏
+By contributing, you agree that your contributions will be licensed under the MIT License.
