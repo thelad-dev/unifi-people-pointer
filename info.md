@@ -12,7 +12,7 @@
 
 ## Quick Start
 
-1. **Install** via HACS and restart Home Assistant
+1. **Install** via HACS as a custom repository (`https://github.com/thelad-dev/unifi-people-pointer`, category Integration) — not in the HACS default store yet
 2. **Create API token** in UniFi Controller (Settings → Admins → Add Admin → View Only)
 3. **Add integration** in Settings → Devices & Services with host, API token, and SSL verify
 4. **Optionally** set scan interval under the integration options
