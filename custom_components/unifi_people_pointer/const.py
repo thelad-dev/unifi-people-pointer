@@ -1,4 +1,5 @@
 """Constants for the UniFi People Pointer integration."""
+
 from datetime import timedelta
 
 DOMAIN = "unifi_people_pointer"

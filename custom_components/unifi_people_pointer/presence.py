@@ -1,7 +1,7 @@
 """Presence detection logic."""
+
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -40,7 +40,7 @@ def calculate_confidence(
 
 class PresenceTracker:
     """Track presence state with history."""
-    
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -56,27 +56,27 @@ class PresenceTracker:
         self.people = people
         self.debounce_seconds = debounce_seconds
         self.track_history = track_history
-    
+
     def update(self, clients: list[dict[str, Any]]) -> None:
         """Update presence based on current clients."""
         # TODO: Implement update
         raise NotImplementedError("To be implemented in Phase 1-4")
-    
+
     def update_presence(self, entity_id: str, is_home: bool) -> None:
         """Update presence for a specific entity."""
         # TODO: Implement presence update
         raise NotImplementedError("To be implemented in Phase 1-4")
-    
+
     def get_state(self, entity_id: str) -> str:
         """Get current presence state."""
         # TODO: Implement state getter
         raise NotImplementedError("To be implemented in Phase 1-4")
-    
+
     def get_debounced_state(self, entity_id: str) -> bool:
         """Get debounced presence state."""
         # TODO: Implement debounced state
         raise NotImplementedError("To be implemented in Phase 1-4")
-    
+
     def get_history(self, entity_id: str, hours: int = 24) -> list[dict[str, Any]]:
         """Get presence history."""
         # TODO: Implement history retrieval

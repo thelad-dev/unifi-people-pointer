@@ -1,18 +1,18 @@
 """Event system for UniFi People Pointer with debouncing."""
+
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
 
 from .const import (
-    DOMAIN,
+    DEFAULT_EVENT_DEBOUNCE,
+    EVENT_DEVICE_CONNECTED,
     EVENT_PERSON_ARRIVED,
     EVENT_PERSON_LEFT,
-    EVENT_DEVICE_CONNECTED,
     EVENT_UNKNOWN_DEVICE,
-    DEFAULT_EVENT_DEBOUNCE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,7 +21,9 @@ _LOGGER = logging.getLogger(__name__)
 class EventDebouncer:
     """Debouncer for preventing event spam from WiFi flapping."""
 
-    def __init__(self, hass: HomeAssistant, debounce_seconds: int = DEFAULT_EVENT_DEBOUNCE):
+    def __init__(
+        self, hass: HomeAssistant, debounce_seconds: int = DEFAULT_EVENT_DEBOUNCE
+    ):
         """Initialize debouncer."""
         self.hass = hass
         self.debounce_seconds = debounce_seconds
@@ -40,15 +42,15 @@ class EventDebouncer:
 
         event_data = self._pending_events.pop(event_key)
         event_type = event_data.pop("_event_type")
-        
+
         _LOGGER.debug(
             "Firing debounced event: %s with data: %s",
             event_type,
             event_data,
         )
-        
+
         self.hass.bus.async_fire(event_type, event_data)
-        
+
         # Clean up timer reference
         if event_key in self._timers:
             del self._timers[event_key]
@@ -62,16 +64,16 @@ class EventDebouncer:
     ) -> None:
         """Schedule an event with debouncing."""
         event_key = self._get_event_key(event_type, identifier)
-        
+
         # Cancel existing timer if present
         if event_key in self._timers:
             self._timers[event_key]()
             del self._timers[event_key]
-        
+
         # Store event data with type
         event_data_with_type = {**event_data, "_event_type": event_type}
         self._pending_events[event_key] = event_data_with_type
-        
+
         # Schedule new timer
         if self.debounce_seconds > 0:
             _LOGGER.debug(
@@ -93,11 +95,11 @@ class EventDebouncer:
     def cancel_event(self, event_type: str, identifier: str) -> None:
         """Cancel a pending event."""
         event_key = self._get_event_key(event_type, identifier)
-        
+
         if event_key in self._timers:
             self._timers[event_key]()
             del self._timers[event_key]
-        
+
         if event_key in self._pending_events:
             del self._pending_events[event_key]
 
@@ -105,7 +107,9 @@ class EventDebouncer:
 class UniFiEventManager:
     """Manager for UniFi People Pointer events."""
 
-    def __init__(self, hass: HomeAssistant, debounce_seconds: int = DEFAULT_EVENT_DEBOUNCE):
+    def __init__(
+        self, hass: HomeAssistant, debounce_seconds: int = DEFAULT_EVENT_DEBOUNCE
+    ):
         """Initialize event manager."""
         self.hass = hass
         self._debouncer = EventDebouncer(hass, debounce_seconds)
@@ -125,14 +129,14 @@ class UniFiEventManager:
             "device": device,
             "timestamp": datetime.now().isoformat(),
         }
-        
+
         if ap_name:
             event_data["ap_name"] = ap_name
         if zone:
             event_data["zone"] = zone
         if signal_strength is not None:
             event_data["signal_strength"] = signal_strength
-        
+
         self._debouncer.schedule_event(
             EVENT_PERSON_ARRIVED,
             person,
@@ -153,12 +157,12 @@ class UniFiEventManager:
             "device": device,
             "timestamp": datetime.now().isoformat(),
         }
-        
+
         if last_seen:
             event_data["last_seen"] = last_seen.isoformat()
         if duration is not None:
             event_data["duration"] = duration
-        
+
         self._debouncer.schedule_event(
             EVENT_PERSON_LEFT,
             person,
@@ -180,7 +184,7 @@ class UniFiEventManager:
             "mac": mac,
             "timestamp": datetime.now().isoformat(),
         }
-        
+
         if person:
             event_data["person"] = person
         if device_type:
@@ -191,7 +195,7 @@ class UniFiEventManager:
             event_data["zone"] = zone
         if signal_strength is not None:
             event_data["signal_strength"] = signal_strength
-        
+
         self._debouncer.schedule_event(
             EVENT_DEVICE_CONNECTED,
             mac,
@@ -213,7 +217,7 @@ class UniFiEventManager:
             "mac": mac,
             "timestamp": datetime.now().isoformat(),
         }
-        
+
         if ip:
             event_data["ip"] = ip
         if hostname:
@@ -224,7 +228,7 @@ class UniFiEventManager:
             event_data["ap_name"] = ap_name
         if signal_strength is not None:
             event_data["signal_strength"] = signal_strength
-        
+
         self._debouncer.schedule_event(
             EVENT_UNKNOWN_DEVICE,
             mac,

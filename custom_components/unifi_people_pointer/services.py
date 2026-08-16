@@ -1,60 +1,77 @@
 """Service handlers for UniFi People Pointer."""
-import logging
-import voluptuous as vol
 
+import logging
+
+import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
-import homeassistant.helpers.config_validation as cv
 
 from .const import (
-    DOMAIN,
-    SERVICE_ASSIGN_DEVICE,
-    SERVICE_TRACK_DEVICE,
-    SERVICE_REMOVE_DEVICE,
-    SERVICE_SCAN_NOW,
-    SERVICE_FORCE_UPDATE_PERSON,
-    SERVICE_CLAIM_UNKNOWN_DEVICE,
     DEVICE_TYPE_PRIMARY,
     DEVICE_TYPE_SECONDARY,
+    DOMAIN,
+    SERVICE_ASSIGN_DEVICE,
+    SERVICE_CLAIM_UNKNOWN_DEVICE,
+    SERVICE_FORCE_UPDATE_PERSON,
+    SERVICE_REMOVE_DEVICE,
+    SERVICE_SCAN_NOW,
+    SERVICE_TRACK_DEVICE,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
 # Service schemas
-ASSIGN_DEVICE_SCHEMA = vol.Schema({
-    vol.Required("mac"): cv.string,
-    vol.Required("person"): cv.string,
-    vol.Required("device_type"): vol.In([DEVICE_TYPE_PRIMARY, DEVICE_TYPE_SECONDARY]),
-    vol.Optional("device_name"): cv.string,
-})
+ASSIGN_DEVICE_SCHEMA = vol.Schema(
+    {
+        vol.Required("mac"): cv.string,
+        vol.Required("person"): cv.string,
+        vol.Required("device_type"): vol.In(
+            [DEVICE_TYPE_PRIMARY, DEVICE_TYPE_SECONDARY]
+        ),
+        vol.Optional("device_name"): cv.string,
+    }
+)
 
-TRACK_DEVICE_SCHEMA = vol.Schema({
-    vol.Required("mac"): cv.string,
-    vol.Required("name"): cv.string,
-    vol.Optional("device_type"): vol.In([
-        "smartphone", "laptop", "tablet", "desktop", "iot", "other"
-    ]),
-})
+TRACK_DEVICE_SCHEMA = vol.Schema(
+    {
+        vol.Required("mac"): cv.string,
+        vol.Required("name"): cv.string,
+        vol.Optional("device_type"): vol.In(
+            ["smartphone", "laptop", "tablet", "desktop", "iot", "other"]
+        ),
+    }
+)
 
-REMOVE_DEVICE_SCHEMA = vol.Schema({
-    vol.Required("mac"): cv.string,
-})
+REMOVE_DEVICE_SCHEMA = vol.Schema(
+    {
+        vol.Required("mac"): cv.string,
+    }
+)
 
-SCAN_NOW_SCHEMA = vol.Schema({
-    vol.Optional("target", default="all"): cv.string,
-})
+SCAN_NOW_SCHEMA = vol.Schema(
+    {
+        vol.Optional("target", default="all"): cv.string,
+    }
+)
 
-FORCE_UPDATE_PERSON_SCHEMA = vol.Schema({
-    vol.Required("person"): cv.string,
-})
+FORCE_UPDATE_PERSON_SCHEMA = vol.Schema(
+    {
+        vol.Required("person"): cv.string,
+    }
+)
 
-CLAIM_UNKNOWN_DEVICE_SCHEMA = vol.Schema({
-    vol.Required("mac"): cv.string,
-    vol.Required("person"): cv.string,
-    vol.Required("device_type"): vol.In([DEVICE_TYPE_PRIMARY, DEVICE_TYPE_SECONDARY]),
-    vol.Optional("device_name"): cv.string,
-})
+CLAIM_UNKNOWN_DEVICE_SCHEMA = vol.Schema(
+    {
+        vol.Required("mac"): cv.string,
+        vol.Required("person"): cv.string,
+        vol.Required("device_type"): vol.In(
+            [DEVICE_TYPE_PRIMARY, DEVICE_TYPE_SECONDARY]
+        ),
+        vol.Optional("device_name"): cv.string,
+    }
+)
 
 
 def setup_services(hass: HomeAssistant) -> None:
@@ -175,7 +192,9 @@ def setup_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError("UniFi People Pointer not initialized")
 
         try:
-            await coordinator.claim_unknown_device(mac, person, device_type, device_name)
+            await coordinator.claim_unknown_device(
+                mac, person, device_type, device_name
+            )
             _LOGGER.info("Successfully claimed device %s for %s", mac, person)
         except Exception as err:
             _LOGGER.error("Error claiming device: %s", err)

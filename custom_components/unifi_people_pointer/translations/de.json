@@ -3,16 +3,31 @@
     "step": {
       "user": {
         "title": "UniFi People Pointer Einrichtung",
-        "description": "Richte UniFi People Pointer für personenbasiertes Presence Tracking ein"
+        "description": "Richte UniFi People Pointer für personenbasiertes Presence Tracking ein",
+        "data": {
+          "host": "UniFi Controller Host",
+          "api_token": "API-Token",
+          "verify_ssl": "SSL-Zertifikat prüfen"
+        }
+      },
+      "reauth_confirm": {
+        "title": "UniFi People Pointer neu authentifizieren",
+        "description": "Gib einen neuen UniFi API-Token ein",
+        "data": {
+          "token": "API-Token"
+        }
       }
     },
     "error": {
       "cannot_connect": "Verbindung zum UniFi Controller fehlgeschlagen",
       "invalid_auth": "Ungültige Authentifizierung",
+      "invalid_host": "Ungültiger Host (IP-Adresse oder Hostname verwenden)",
+      "timeout": "Zeitüberschreitung bei Verbindung zum UniFi Controller",
       "unknown": "Unerwarteter Fehler aufgetreten"
     },
     "abort": {
-      "already_configured": "UniFi People Pointer ist bereits konfiguriert"
+      "already_configured": "UniFi People Pointer ist bereits konfiguriert",
+      "reauth_successful": "Neuauthentifizierung erfolgreich"
     }
   },
   "options": {
@@ -21,11 +36,7 @@
         "title": "UniFi People Pointer Optionen",
         "description": "Konfiguriere Polling und Event Einstellungen",
         "data": {
-          "poll_interval": "Polling Intervall (Sekunden)",
-          "grace_period": "Karenzzeit (Sekunden)",
-          "event_debounce": "Event Debounce (Sekunden)",
-          "enable_mobile_app_fallback": "Mobile App Fallback aktivieren",
-          "enable_ping_fallback": "Ping Fallback aktivieren"
+          "scan_interval": "Scan-Intervall (Sekunden)"
         }
       }
     }
