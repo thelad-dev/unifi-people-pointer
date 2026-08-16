@@ -1,9 +1,12 @@
 """Unit tests for config flow."""
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_HOST, CONF_TOKEN
 from homeassistant.core import HomeAssistant
+
+# Form schema uses api_token; entry data stores CONF_TOKEN (homeassistant.const).
+CONF_API_TOKEN = "api_token"
 
 
 @pytest.mark.unit
@@ -33,7 +36,7 @@ class TestConfigFlow:
                 context={"source": config_entries.SOURCE_USER},
                 data={
                     CONF_HOST: "192.168.88.1",
-                    CONF_TOKEN: "valid_token_12345",
+                    CONF_API_TOKEN: "valid_token_12345",
                     "verify_ssl": False
                 }
             )
@@ -50,7 +53,7 @@ class TestConfigFlow:
             context={"source": config_entries.SOURCE_USER},
             data={
                 CONF_HOST: "not_a_valid_ip",
-                CONF_TOKEN: "valid_token_12345",
+                CONF_API_TOKEN: "valid_token_12345",
                 "verify_ssl": False
             }
         )
@@ -70,7 +73,7 @@ class TestConfigFlow:
                 context={"source": config_entries.SOURCE_USER},
                 data={
                     CONF_HOST: "192.168.88.1",
-                    CONF_TOKEN: "valid_token_12345",
+                    CONF_API_TOKEN: "valid_token_12345",
                     "verify_ssl": False
                 }
             )
@@ -90,7 +93,7 @@ class TestConfigFlow:
                 context={"source": config_entries.SOURCE_USER},
                 data={
                     CONF_HOST: "192.168.88.1",
-                    CONF_TOKEN: "invalid_token",
+                    CONF_API_TOKEN: "invalid_token",
                     "verify_ssl": False
                 }
             )
@@ -110,7 +113,7 @@ class TestConfigFlow:
                 context={"source": config_entries.SOURCE_USER},
                 data={
                     CONF_HOST: "192.168.88.1",
-                    CONF_TOKEN: "valid_token_12345",
+                    CONF_API_TOKEN: "valid_token_12345",
                     "verify_ssl": False
                 }
             )
@@ -132,7 +135,7 @@ class TestConfigFlow:
                 context={"source": config_entries.SOURCE_USER},
                 data={
                     CONF_HOST: "192.168.88.1",
-                    CONF_TOKEN: "valid_token_12345",
+                    CONF_API_TOKEN: "valid_token_12345",
                     "verify_ssl": False
                 }
             )

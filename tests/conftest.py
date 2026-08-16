@@ -1,15 +1,39 @@
 """Pytest configuration and shared fixtures for UniFi People Pointer tests."""
 import json
+import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
+
 import pytest
-from homeassistant.core import HomeAssistant
-from homeassistant.setup import async_setup_component
 from homeassistant.const import CONF_HOST, CONF_TOKEN
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    load_fixture,
-)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+pytest_plugins = "pytest_homeassistant_custom_component"
+
+# Project root must win over pytest-homeassistant's testing_config/custom_components.
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations):
+    """Enable custom integrations from this repository.
+
+    Home Assistant's test harness mounts ``testing_config`` and can cache an empty
+    ``custom_components`` package in ``sys.modules``. Clear that cache so our
+    integration under ``./custom_components`` is discoverable.
+    """
+    for key in list(sys.modules):
+        if key == "custom_components" or key.startswith("custom_components."):
+            del sys.modules[key]
+
+    if sys.path[0] != str(_PROJECT_ROOT):
+        sys.path.insert(0, str(_PROJECT_ROOT))
+
+    import custom_components  # noqa: F401
+
+    yield
 
 
 @pytest.fixture
@@ -274,17 +298,6 @@ async def mock_unifi_client():
     client.get_sites = AsyncMock(return_value=[{"name": "default", "desc": "Default"}])
     client.is_connected = True
     return client
-
-
-@pytest.fixture
-async def hass(event_loop):
-    """Return a Home Assistant instance for testing."""
-    from homeassistant.core import HomeAssistant
-    
-    hass = HomeAssistant()
-    await hass.async_block_till_done()
-    yield hass
-    await hass.async_stop()
 
 
 @pytest.fixture

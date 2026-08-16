@@ -3,16 +3,31 @@
     "step": {
       "user": {
         "title": "UniFi People Pointer Setup",
-        "description": "Set up UniFi People Pointer for person-based presence tracking"
+        "description": "Set up UniFi People Pointer for person-based presence tracking",
+        "data": {
+          "host": "UniFi Controller host",
+          "api_token": "API token",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate UniFi People Pointer",
+        "description": "Enter a new UniFi API token",
+        "data": {
+          "token": "API token"
+        }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect to UniFi Controller",
       "invalid_auth": "Invalid authentication",
+      "invalid_host": "Invalid host (use an IP address or hostname)",
+      "timeout": "Connection to UniFi Controller timed out",
       "unknown": "Unexpected error occurred"
     },
     "abort": {
-      "already_configured": "UniFi People Pointer is already configured"
+      "already_configured": "UniFi People Pointer is already configured",
+      "reauth_successful": "Reauthentication successful"
     }
   },
   "options": {
@@ -21,6 +36,7 @@
         "title": "UniFi People Pointer Options",
         "description": "Configure polling and event settings",
         "data": {
+          "scan_interval": "Scan interval (seconds)",
           "poll_interval": "Poll Interval (seconds)",
           "grace_period": "Grace Period (seconds)",
           "event_debounce": "Event Debounce (seconds)",
