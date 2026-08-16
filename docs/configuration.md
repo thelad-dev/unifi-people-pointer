@@ -9,21 +9,24 @@
 
 ### Übersicht
 
-Die Integration verwendet drei JSON-Konfigurationsdateien und eine `.env`-Datei für sensible Daten:
+Die Integration speichert Host, API-Token und SSL-Verify im Config Entry (UI-Setup). JSON-Dateien beschreiben Geräte/Personen; `.env` dient lokalen API-Tests und Doku-Beispielen:
 
 | Datei | Zweck | Versioniert |
 |-------|-------|-------------|
+| Config Entry (UI) | Host, Token, `verify_ssl`; Option `scan_interval` | HA-Storage |
 | `devices.json` | Zu trackende Geräte definieren | ✅ Ja |
 | `people.json` | Zuordnung Geräte → HA-Personen | ✅ Ja |
 | `manufacturers.json` | IEEE OUI-Präfixe | ✅ Ja |
-| `.env` | API-Token (sensibel) | ❌ Nein (`.gitignore`) |
+| `.env` | API-Token für lokale Tools/Beispiele | ❌ Nein (`.gitignore`) |
 
-### 1. API-Zugriff konfigurieren (`.env`)
+### 1. API-Zugriff (Config Flow und optional `.env`)
 
-Erstelle eine `.env`-Datei im Integrationsverzeichnis:
+**In Home Assistant:** Integration hinzufügen und Host, API-Token sowie SSL-Prüfung eingeben. Der Token landet im Config Entry, nicht in `.env`.
+
+**Für lokale curl-/Doku-Tests** eine `.env` im Repo anlegen:
 
 ```bash
-# UniFi Network Integration API Token
+# UniFi Network Integration API Token (nur lokale Tools)
 unifi_api_token="your-api-token-here"
 
 # Optional: Controller-Adresse (Standard: 192.168.88.1)
@@ -38,7 +41,7 @@ unifi_api_token="your-api-token-here"
 2. Settings → Admins
 3. Add Admin → Role: View Only
 4. Generate API Token
-5. Token kopieren und in `.env` einfügen
+5. Token im HA-Config-Flow eintragen (oder für Tools in `.env`)
 
 **Beispiel `.env.example`:**
 ```bash
@@ -275,12 +278,7 @@ automation:
 
 #### Scan-Intervall anpassen
 
-Standard: 30 Sekunden. In `configuration.yaml`:
-
-```yaml
-unifi_people_pointer:
-  scan_interval: 30  # Sekunden
-```
+Standard: 45 Sekunden. In der Integration unter **Konfigurieren** (Options-Flow) als `scan_interval` setzen (10–600).
 
 #### Debug-Logging aktivieren
 
@@ -323,21 +321,24 @@ Settings → Devices & Services → UniFi People Pointer → ⚙️ → Reload
 
 ### Overview
 
-The integration uses three JSON configuration files and a `.env` file for sensitive data:
+The integration stores host, API token, and SSL verify in the config entry (UI setup). JSON files describe devices/people; `.env` is for local API tests and doc examples:
 
 | File | Purpose | Version Controlled |
 |------|---------|-------------------|
+| Config entry (UI) | Host, token, `verify_ssl`; option `scan_interval` | HA storage |
 | `devices.json` | Define devices to track | ✅ Yes |
 | `people.json` | Map devices → HA persons | ✅ Yes |
 | `manufacturers.json` | IEEE OUI prefixes | ✅ Yes |
-| `.env` | API token (sensitive) | ❌ No (`.gitignore`) |
+| `.env` | API token for local tools/examples | ❌ No (`.gitignore`) |
 
-### 1. Configure API Access (`.env`)
+### 1. API access (config flow and optional `.env`)
 
-Create a `.env` file in the integration directory:
+**In Home Assistant:** Add the integration and enter host, API token, and SSL verification. The token is stored in the config entry, not in `.env`.
+
+**For local curl/doc tests**, create a `.env` in the repo:
 
 ```bash
-# UniFi Network Integration API Token
+# UniFi Network Integration API Token (local tools only)
 unifi_api_token="your-api-token-here"
 
 # Optional: Controller address (default: 192.168.88.1)
@@ -352,7 +353,7 @@ unifi_api_token="your-api-token-here"
 2. Settings → Admins
 3. Add Admin → Role: View Only
 4. Generate API Token
-5. Copy token and paste into `.env`
+5. Enter the token in the HA config flow (or in `.env` for tools)
 
 **Example `.env.example`:**
 ```bash
@@ -589,12 +590,7 @@ automation:
 
 #### Adjust scan interval
 
-Default: 30 seconds. In `configuration.yaml`:
-
-```yaml
-unifi_people_pointer:
-  scan_interval: 30  # seconds
-```
+Default: 45 seconds. Set `scan_interval` (10–600) under the integration **Configure** options flow.
 
 #### Enable debug logging
 

@@ -1,0 +1,18 @@
+[run]
+source = custom_components/unifi_people_pointer
+# Phase 3+ modules are still stubs; exclude until they have real tests.
+omit =
+    */api_parser.py
+    */coordinator.py
+    */data_loader.py
+    */device_matcher.py
+    */device_tracker.py
+    */events.py
+    */presence.py
+    */sensor.py
+    */services.py
+    */template_helpers.py
+
+[report]
+show_missing = true
+skip_covered = false

@@ -246,17 +246,7 @@ This test suite was designed with TDD principles:
 
 ## Implementation Notes
 
-The test suite includes stub implementations for all tested modules:
-
-- `__init__.py` - Integration setup
-- `config_flow.py` - Configuration flow
-- `api_parser.py` - API response parsing
-- `device_matcher.py` - Device matching logic
-- `data_loader.py` - Data file loading
-- `coordinator.py` - Data coordinator
-- `presence.py` - Presence detection
-
-These stubs use `NotImplementedError` to indicate where the actual implementation from Phases 1-4 should go. The test suite validates the expected interface and behavior.
+`config_flow.py` and `__init__.py` are implemented for setup (user / options / reauth, entry storage). Other modules under test may still be stubs; see `AGENTS.md` for the current implementation status.
 
 ## Next Steps
 

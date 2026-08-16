@@ -27,19 +27,26 @@
    - Available in templates, automations, scripts
 
 4. **Integration Structure**
-   - `__init__.py` - Entry point, service & helper registration
+   - `__init__.py` - Entry point; setup stores entry in `hass.data` (platforms deferred)
    - `const.py` - Constants and defaults
-   - `config_flow.py` - Config UI flow
+   - `config_flow.py` - User / options / reauth flows with UniFi API validation
    - `coordinator.py` - Data coordinator with stub methods
    - `manifest.json` - Integration metadata
    - `strings.json` + translations - UI strings (EN/DE)
 
+**Config flow (ships with this branch):**
+
+- Form schema keys: `host`, `api_token`, `verify_ssl`
+- Entry data keys: `CONF_HOST`, `CONF_TOKEN` (`token`), `verify_ssl` — form `api_token` is mapped to `CONF_TOKEN` on create
+- `validate_api_connection` hits `GET /proxy/network/integration/v1/sites` with `X-API-KEY`
+- Options flow updates `scan_interval`; reauth step is `reauth_confirm`
+- No `NotImplementedError` on config/setup path (avoids HA HTTP 500 when adding the integration)
+
 **What's Stubbed:**
 
-- Coordinator methods (no actual UniFi API integration yet)
-- No device_tracker or sensor entities
+- Coordinator methods (no full UniFi client wiring yet)
+- Device tracker / sensor platforms not forwarded from setup yet
 - No JSON file storage (people.json, devices.json, etc.)
-- No UniFi API client
 
 ## Architecture Decisions
 
@@ -82,7 +89,7 @@ Template helpers are registered in `hass.data["template_functions"]` dict. This 
 custom_components/unifi_people_pointer/
 ├── __init__.py              # Integration setup, service/helper registration
 ├── const.py                 # All constants (events, services, defaults)
-├── config_flow.py           # Config UI (currently stub, creates default config)
+├── config_flow.py           # User/options/reauth config flow + API validation
 ├── coordinator.py           # Data coordinator (stub methods for Phase 2)
 ├── events.py                # Event system + debouncer
 ├── services.py              # Service handlers + schemas
@@ -208,6 +215,10 @@ When testing this integration:
 ### Issue: Coordinator not found in services
 **Solution:** Verify `async_setup_entry()` stores coordinator in `hass.data[DOMAIN]`, check initialization order
 
+### Issue: Tests cannot find integration `unifi_people_pointer`
+**Cause:** HA test harness caches empty `testing_config/custom_components` in `sys.modules`.
+**Solution:** `tests/conftest.py` clears that cache and prefers the repo `custom_components` package (`pythonpath = .` in `pytest.ini`).
+
 ## Maintaining this file
 
 When making changes to this project:
@@ -217,6 +228,8 @@ When making changes to this project:
 3. **Update AGENTS.md** when making architectural decisions
 4. **Update translations** (en.json, de.json) when changing UI strings
 5. **Update services.yaml** when modifying service schemas
+
+Keep this file for durable project knowledge only. Prefer pointers to authoritative files over copying large specs.
 
 ## Scout Report Reference
 
@@ -250,6 +263,6 @@ This implementation follows the scout report's Phase 2 specification for Service
 
 ## Git Workflow
 
-Branch: `fm/unifi-phase2-20260815`
+Branch: `fm/unifi-pp-config-flow-500-20260816`
 
 This is a firstmate-managed autonomous worker branch. Changes will be submitted as a PR for review.

@@ -1,9 +1,9 @@
 """Template helpers for UniFi People Pointer."""
+
 import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.template import Template
 
 from .const import DOMAIN, STATE_HOME
 
@@ -16,13 +16,13 @@ def setup_template_helpers(hass: HomeAssistant) -> None:
     def unifi_person_home(person_id: str) -> bool:
         """
         Check if a person is home.
-        
+
         Usage in templates:
             {{ unifi_person_home('sebastian') }}
-        
+
         Args:
             person_id: Person identifier (slug)
-            
+
         Returns:
             True if person is home, False otherwise
         """
@@ -41,13 +41,13 @@ def setup_template_helpers(hass: HomeAssistant) -> None:
     def unifi_device_connected(mac: str) -> bool:
         """
         Check if a device is connected.
-        
+
         Usage in templates:
             {{ unifi_device_connected('AA:BB:CC:DD:EE:FF') }}
-        
+
         Args:
             mac: Device MAC address
-            
+
         Returns:
             True if device is connected, False otherwise
         """
@@ -65,13 +65,13 @@ def setup_template_helpers(hass: HomeAssistant) -> None:
     def unifi_person_zone(person_id: str) -> str | None:
         """
         Get the current zone of a person.
-        
+
         Usage in templates:
             {{ unifi_person_zone('sebastian') }}
-        
+
         Args:
             person_id: Person identifier (slug)
-            
+
         Returns:
             Zone name (e.g., 'eg', 'og') or None if not home
         """
@@ -89,13 +89,13 @@ def setup_template_helpers(hass: HomeAssistant) -> None:
     def unifi_device_signal(mac: str) -> int | None:
         """
         Get signal strength of a device in dBm.
-        
+
         Usage in templates:
             {{ unifi_device_signal('AA:BB:CC:DD:EE:FF') }}
-        
+
         Args:
             mac: Device MAC address
-            
+
         Returns:
             Signal strength in dBm (e.g., -45) or None if not connected
         """
@@ -113,13 +113,13 @@ def setup_template_helpers(hass: HomeAssistant) -> None:
     def unifi_person_devices(person_id: str) -> dict[str, Any]:
         """
         Get all devices for a person.
-        
+
         Usage in templates:
             {{ unifi_person_devices('sebastian') }}
-        
+
         Args:
             person_id: Person identifier (slug)
-            
+
         Returns:
             Dict with 'primary' and 'secondary' device lists
         """
@@ -153,5 +153,5 @@ def unregister_template_helpers(hass: HomeAssistant) -> None:
     template_functions.pop("unifi_person_zone", None)
     template_functions.pop("unifi_device_signal", None)
     template_functions.pop("unifi_person_devices", None)
-    
+
     _LOGGER.info("UniFi People Pointer template helpers unregistered")
