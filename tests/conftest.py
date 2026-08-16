@@ -1,15 +1,40 @@
 """Pytest configuration and shared fixtures for UniFi People Pointer tests."""
+
 import json
+import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
+
 import pytest
-from homeassistant.core import HomeAssistant
-from homeassistant.setup import async_setup_component
 from homeassistant.const import CONF_HOST, CONF_TOKEN
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    load_fixture,
-)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+pytest_plugins = "pytest_homeassistant_custom_component"
+
+# Project root must win over pytest-homeassistant's testing_config/custom_components.
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations):
+    """Enable custom integrations from this repository.
+
+    Home Assistant's test harness mounts ``testing_config`` and can cache an empty
+    ``custom_components`` package in ``sys.modules``. Clear that cache so our
+    integration under ``./custom_components`` is discoverable.
+    """
+    for key in list(sys.modules):
+        if key == "custom_components" or key.startswith("custom_components."):
+            del sys.modules[key]
+
+    if sys.path[0] != str(_PROJECT_ROOT):
+        sys.path.insert(0, str(_PROJECT_ROOT))
+
+    import custom_components  # noqa: F401
+
+    yield
 
 
 @pytest.fixture
@@ -37,19 +62,19 @@ def manufacturers_data():
             {
                 "id": "apple",
                 "oui_prefixes": ["00:03:93", "00:05:02", "38:7f:8b", "1c:3c:78"],
-                "ieee_assignment_names": ["Apple, Inc."]
+                "ieee_assignment_names": ["Apple, Inc."],
             },
             {
                 "id": "samsung",
                 "oui_prefixes": ["00:00:f0", "50:32:75"],
-                "ieee_assignment_names": ["Samsung Electronics Co.,Ltd"]
+                "ieee_assignment_names": ["Samsung Electronics Co.,Ltd"],
             },
             {
                 "id": "google",
                 "oui_prefixes": ["3c:5a:b4", "f4:f5:e8"],
-                "ieee_assignment_names": ["Google, Inc."]
-            }
-        ]
+                "ieee_assignment_names": ["Google, Inc."],
+            },
+        ],
     }
 
 
@@ -67,7 +92,7 @@ def devices_data():
                 "mac": "1c:3c:78:00:00:01",
                 "hostname_match": ["iPhone-AN"],
                 "track": True,
-                "notes": "Primary iPhone"
+                "notes": "Primary iPhone",
             },
             {
                 "id": "iphone-rbkl",
@@ -77,7 +102,7 @@ def devices_data():
                 "mac": "38:7f:8b:00:00:02",
                 "hostname_match": ["iPhone-RBKL"],
                 "track": True,
-                "notes": "Primary iPhone Christoph"
+                "notes": "Primary iPhone Christoph",
             },
             {
                 "id": "android-guests",
@@ -87,7 +112,7 @@ def devices_data():
                 "mac": "00:a9:0b:00:00:06",
                 "hostname_match": ["android-00A90B000006"],
                 "track": True,
-                "notes": "Android device"
+                "notes": "Android device",
             },
             {
                 "id": "watch-1",
@@ -97,7 +122,7 @@ def devices_data():
                 "mac": "82:00:00:00:00:03",
                 "hostname_match": ["Watch"],
                 "track": True,
-                "notes": "Apple Watch with private MAC"
+                "notes": "Apple Watch with private MAC",
             },
             {
                 "id": "iphone-legacy",
@@ -107,9 +132,9 @@ def devices_data():
                 "mac": "02:00:00:00:00:04",
                 "hostname_match": ["iPhone"],
                 "track": False,
-                "notes": "Old/randomized MAC - not tracked"
-            }
-        ]
+                "notes": "Old/randomized MAC - not tracked",
+            },
+        ],
     }
 
 
@@ -124,23 +149,23 @@ def people_data():
                 "name": "Christoph",
                 "ha_person": "person.example",
                 "device_ids": ["iphone-rbkl", "watch-1"],
-                "notes": None
+                "notes": None,
             },
             {
                 "id": "amelie",
                 "name": "Amelie",
                 "ha_person": "person.amelie",
                 "device_ids": ["iphone-an"],
-                "notes": None
+                "notes": None,
             },
             {
                 "id": "tablet",
                 "name": "Tablet",
                 "ha_person": "person.android",
                 "device_ids": ["android-guests"],
-                "notes": None
-            }
-        ]
+                "notes": None,
+            },
+        ],
     }
 
 
@@ -157,7 +182,7 @@ def mock_unifi_api_clients_online():
             "ap_mac": "24:5a:4c:aa:bb:cc",
             "signal": -45,
             "channel": 36,
-            "essid": "HomeNetwork"
+            "essid": "HomeNetwork",
         },
         {
             "mac": "38:7f:8b:00:00:02",
@@ -168,7 +193,7 @@ def mock_unifi_api_clients_online():
             "ap_mac": "24:5a:4c:aa:bb:cc",
             "signal": -52,
             "channel": 36,
-            "essid": "HomeNetwork"
+            "essid": "HomeNetwork",
         },
         {
             "mac": "82:00:00:00:00:03",
@@ -179,8 +204,8 @@ def mock_unifi_api_clients_online():
             "ap_mac": "24:5a:4c:aa:bb:dd",
             "signal": -65,
             "channel": 149,
-            "essid": "HomeNetwork"
-        }
+            "essid": "HomeNetwork",
+        },
     ]
 
 
@@ -197,7 +222,7 @@ def mock_unifi_api_clients_flapping():
             "ap_mac": "24:5a:4c:aa:bb:cc",
             "signal": -72,  # Poor signal
             "channel": 36,
-            "essid": "HomeNetwork"
+            "essid": "HomeNetwork",
         }
     ]
 
@@ -215,7 +240,7 @@ def mock_unifi_api_unknown_macs():
             "ap_mac": "24:5a:4c:aa:bb:cc",
             "signal": -45,
             "channel": 36,
-            "essid": "HomeNetwork"
+            "essid": "HomeNetwork",
         },
         {
             "mac": "11:22:33:44:55:66",
@@ -226,8 +251,8 @@ def mock_unifi_api_unknown_macs():
             "ap_mac": "24:5a:4c:aa:bb:cc",
             "signal": -52,
             "channel": 36,
-            "essid": "HomeNetwork"
-        }
+            "essid": "HomeNetwork",
+        },
     ]
 
 
@@ -244,7 +269,7 @@ def mock_unifi_api_duplicate_macs():
             "ap_mac": "24:5a:4c:aa:bb:cc",
             "signal": -45,
             "channel": 36,
-            "essid": "HomeNetwork"
+            "essid": "HomeNetwork",
         },
         {
             "mac": "1c:3c:78:00:00:01",  # Duplicate MAC
@@ -255,8 +280,8 @@ def mock_unifi_api_duplicate_macs():
             "ap_mac": "24:5a:4c:aa:bb:dd",  # Different AP
             "signal": -52,
             "channel": 149,
-            "essid": "HomeNetwork"
-        }
+            "essid": "HomeNetwork",
+        },
     ]
 
 
@@ -277,29 +302,18 @@ async def mock_unifi_client():
 
 
 @pytest.fixture
-async def hass(event_loop):
-    """Return a Home Assistant instance for testing."""
-    from homeassistant.core import HomeAssistant
-    
-    hass = HomeAssistant()
-    await hass.async_block_till_done()
-    yield hass
-    await hass.async_stop()
-
-
-@pytest.fixture
 def mock_data_files(tmp_path, manufacturers_data, devices_data, people_data):
     """Create temporary data files for testing."""
     manufacturers_file = tmp_path / "manufacturers.json"
     devices_file = tmp_path / "devices.json"
     people_file = tmp_path / "people.json"
-    
+
     manufacturers_file.write_text(json.dumps(manufacturers_data, indent=2))
     devices_file.write_text(json.dumps(devices_data, indent=2))
     people_file.write_text(json.dumps(people_data, indent=2))
-    
+
     return {
         "manufacturers": manufacturers_file,
         "devices": devices_file,
-        "people": people_file
+        "people": people_file,
     }

@@ -1,8 +1,9 @@
 """Device tracker platform for UniFi People Pointer."""
+
 from __future__ import annotations
 
-from datetime import datetime
 import logging
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.device_tracker import SourceType
@@ -25,7 +26,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up UniFi People Pointer device tracker from config entry."""
-    coordinator: UniFiPeoplePointerCoordinator = hass.data[DOMAIN][entry.entry_id]
+    # Coordinator is registered at setup; entity creation lands in Phase 3.
+    _ = hass.data[DOMAIN][entry.entry_id]
 
     # TODO: Load people and devices from JSON files
     # For now, create empty lists
@@ -51,7 +53,9 @@ async def async_setup_entry(
         async_add_entities(entities)
         _LOGGER.info("Added %d device tracker entities", len(entities))
     else:
-        _LOGGER.info("No device trackers to add (people.json/devices.json not yet created)")
+        _LOGGER.info(
+            "No device trackers to add (people.json/devices.json not yet created)"
+        )
 
 
 class UniFiPersonTracker(CoordinatorEntity, TrackerEntity):
@@ -210,7 +214,7 @@ class UniFiDeviceTracker(CoordinatorEntity, TrackerEntity):
         client = self.hass.loop.run_in_executor(
             None, self.coordinator.async_get_client_by_mac, self._mac
         )
-        
+
         if client:
             self._ip = client.get("ip")
             self._hostname = client.get("hostname")

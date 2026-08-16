@@ -1,4 +1,5 @@
 """UniFi API response parsing utilities."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -58,7 +59,9 @@ def deduplicate_clients(clients: list[dict[str, Any]]) -> list[dict[str, Any]]:
     raise NotImplementedError("To be implemented in Phase 1-4")
 
 
-def deduplicate_clients_by_signal(clients: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def deduplicate_clients_by_signal(
+    clients: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Remove duplicate clients, keeping strongest signal."""
     # TODO: Implement signal-based deduplication
     raise NotImplementedError("To be implemented in Phase 1-4")

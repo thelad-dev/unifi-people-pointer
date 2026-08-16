@@ -43,15 +43,12 @@ UniFi People Pointer ist eine fortschrittliche Home Assistant Integration, die P
 1. Gehe zu **Einstellungen** → **Geräte & Dienste** → **Integration hinzufügen**
 2. Suche nach "UniFi People Pointer"
 3. Gib deine UniFi Controller Details ein:
-   - **Controller URL**: z.B. `https://192.168.1.1:8443`
-   - **API Key**: Erstelle einen unter Einstellungen → Admins → API Token
-   - **Site ID**: Normalerweise `default`
+   - **Host**: IP oder Hostname, z.B. `192.168.1.1` (IPv6 ohne Klammern; die Integration setzt sie in der URL)
+   - **API-Token**: Erstelle einen unter Einstellungen → Admins → API Token
+   - **SSL-Zertifikat prüfen**: Standard an; bei selbstsignierten Zertifikaten aus
 
-4. Konfiguriere Polling & Fallback:
-   - **Poll Interval**: Wie oft nach Geräten gesucht wird (Standard: 45s)
-   - **Grace Period**: Wie lange gewartet wird bevor jemand als "weg" markiert wird (Standard: 10min)
-   - **Mobile App Fallback**: Nutze Home Assistant Mobile App als Backup
-   - **Ping Fallback**: Nutze ICMP Ping als zusätzliche Verifizierung
+4. Optional unter **Optionen konfigurieren**:
+   - **Scan-Intervall**: Wie oft nach Geräten gesucht wird (Standard: 45s, Bereich 10–600)
 
 #### 📱 Personen & Geräte einrichten
 
@@ -172,15 +169,12 @@ UniFi People Pointer is an advanced Home Assistant integration that tracks peopl
 1. Go to **Settings** → **Devices & Services** → **Add Integration**
 2. Search for "UniFi People Pointer"
 3. Enter your UniFi Controller details:
-   - **Controller URL**: e.g., `https://192.168.1.1:8443`
-   - **API Key**: Create one under Settings → Admins → API Token
-   - **Site ID**: Usually `default`
+   - **Host**: IP or hostname, e.g. `192.168.1.1` (IPv6 without brackets; the integration adds them in the URL)
+   - **API token**: Create one under Settings → Admins → API Token
+   - **Verify SSL certificate**: On by default; turn off for self-signed certificates
 
-4. Configure Polling & Fallback:
-   - **Poll Interval**: How often to scan for devices (default: 45s)
-   - **Grace Period**: How long to wait before marking someone as "away" (default: 10min)
-   - **Mobile App Fallback**: Use Home Assistant Mobile App as backup
-   - **Ping Fallback**: Use ICMP ping as additional verification
+4. Optionally under **Configure**:
+   - **Scan interval**: How often to scan for devices (default: 45s, range 10–600)
 
 #### 📱 Setting up People & Devices
 

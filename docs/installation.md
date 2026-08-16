@@ -50,36 +50,25 @@
 
 ### Nach der Installation
 
-1. **API-Token konfigurieren:**
-   
-   Erstelle eine `.env`-Datei im Integrationsverzeichnis:
-   ```bash
-   unifi_api_token="your-api-token-here"
-   ```
-
-   ⚠️ **Wichtig:** Die `.env`-Datei wird **nicht** ins Repository committed (`.gitignore`).
-
-2. **UniFi API-Token erstellen:**
+1. **UniFi API-Token erstellen:**
    
    - UniFi Network Controller → Settings
    - Admins → Add Admin
    - Role: View Only
    - Generate API Token
-   - Token kopieren und in `.env` einfügen
+   - Token kopieren
 
-3. **Konfiguration anpassen:**
+2. **Integration in HA hinzufügen:**
    
-   Siehe [configuration.md](configuration.md) für Details zu:
-   - `devices.json` – Zu trackende Geräte
-   - `people.json` – Zuordnung zu HA-Personen
-   - `manufacturers.json` – OUI-Datenbank (normalerweise unverändert)
-
-4. **Integration in HA aktivieren:**
-   
-   - Settings → Devices & Services
-   - **Add Integration**
+   - Settings → Devices & Services → **Add Integration**
    - "UniFi People Pointer" suchen
-   - Konfigurieren und aktivieren
+   - **Host** (IP oder Hostname), **API-Token**, **SSL-Zertifikat prüfen** eingeben
+   - Optional unter Optionen: **Scan-Intervall** (Standard 45s)
+
+3. **Personen & Geräte konfigurieren:**
+   
+   Siehe [configuration.md](configuration.md) für `devices.json` / `people.json`.  
+   Für lokale API-Tests und Doku-Beispiele bleibt `.env` mit `unifi_api_token` nutzbar (nicht für den HA-Config-Flow).
 
 ### Systemvoraussetzungen
 
@@ -165,36 +154,25 @@ curl -sk -H "X-API-KEY: $unifi_api_token" \
 
 ### Post-Installation
 
-1. **Configure API token:**
-   
-   Create a `.env` file in the integration directory:
-   ```bash
-   unifi_api_token="your-api-token-here"
-   ```
-
-   ⚠️ **Important:** The `.env` file is **not** committed to the repository (`.gitignore`).
-
-2. **Create UniFi API token:**
+1. **Create UniFi API token:**
    
    - UniFi Network Controller → Settings
    - Admins → Add Admin
    - Role: View Only
    - Generate API Token
-   - Copy token and paste into `.env`
+   - Copy the token
 
-3. **Customize configuration:**
+2. **Add the integration in HA:**
    
-   See [configuration.md](configuration.md) for details on:
-   - `devices.json` – Devices to track
-   - `people.json` – Mapping to HA persons
-   - `manufacturers.json` – OUI database (usually unchanged)
-
-4. **Activate integration in HA:**
-   
-   - Settings → Devices & Services
-   - **Add Integration**
+   - Settings → Devices & Services → **Add Integration**
    - Search for "UniFi People Pointer"
-   - Configure and activate
+   - Enter **Host** (IP or hostname), **API token**, and **Verify SSL certificate**
+   - Optionally under options: **Scan interval** (default 45s)
+
+3. **Configure people & devices:**
+   
+   See [configuration.md](configuration.md) for `devices.json` / `people.json`.  
+   For local API tests and doc examples, `.env` with `unifi_api_token` remains usable (not for the HA config flow).
 
 ### System Requirements
 
