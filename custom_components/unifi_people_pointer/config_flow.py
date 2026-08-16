@@ -69,6 +69,18 @@ def _host_for_url(host: str) -> str:
     return host
 
 
+def _map_api_exception_to_flow_error(err: BaseException) -> str:
+    """Map API validation exceptions to config-flow error keys."""
+    if isinstance(err, PermissionError):
+        return "invalid_auth"
+    if isinstance(err, TimeoutError):
+        return "timeout"
+    if isinstance(err, ConnectionError):
+        return "cannot_connect"
+    _LOGGER.exception("Unexpected config flow error")
+    return "unknown"
+
+
 async def validate_api_connection(
     host: str, token: str, verify_ssl: bool
 ) -> dict[str, Any]:
@@ -157,15 +169,8 @@ class UniFiPeoplePointerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
                 try:
                     await validate_api_connection(host, token, verify_ssl)
-                except PermissionError:
-                    errors["base"] = "invalid_auth"
-                except TimeoutError:
-                    errors["base"] = "timeout"
-                except ConnectionError:
-                    errors["base"] = "cannot_connect"
-                except Exception:  # noqa: BLE001
-                    _LOGGER.exception("Unexpected config flow error")
-                    errors["base"] = "unknown"
+                except Exception as err:  # noqa: BLE001
+                    errors["base"] = _map_api_exception_to_flow_error(err)
                 else:
                     await self.async_set_unique_id(host.lower())
                     self._abort_if_unique_id_configured()
@@ -208,15 +213,8 @@ class UniFiPeoplePointerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 await validate_api_connection(host, token, verify_ssl)
-            except PermissionError:
-                errors["base"] = "invalid_auth"
-            except TimeoutError:
-                errors["base"] = "timeout"
-            except ConnectionError:
-                errors["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
-                _LOGGER.exception("Unexpected reauth error")
-                errors["base"] = "unknown"
+            except Exception as err:  # noqa: BLE001
+                errors["base"] = _map_api_exception_to_flow_error(err)
             else:
                 self.hass.config_entries.async_update_entry(
                     self._reauth_entry,
