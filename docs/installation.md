@@ -7,6 +7,8 @@
 <a name="de"></a>
 ## 🇩🇪 Installation (Deutsch)
 
+Die Integration ist **nicht** im HACS Default Store. Installation läuft über ein **Custom Repository** oder manuell.
+
 ### Methode 1: Installation über HACS (empfohlen)
 
 1. **HACS öffnen** in Home Assistant
@@ -17,21 +19,25 @@
    - **Repository:** `https://github.com/thelad-dev/unifi-people-pointer`
    - **Kategorie:** Integration
 6. Auf **Add** klicken
-7. **UniFi People Pointer** in der Integrationsliste suchen
+7. **UniFi People Pointer** in der Liste der (Custom-)Integrationen finden
 8. **Download** klicken
 9. **Home Assistant neu starten**
 
+Hinweis: Frühere 404-Fehler beim Hinzufügen des Repositories lagen oft am damals privaten Repo. Das Repository ist jetzt öffentlich.
+
 ### Methode 2: Manuelle Installation
 
-1. **Repository klonen:**
+1. **Aus dem Repository kopieren:**
    ```bash
-   cd /config/custom_components
+   cd /tmp
    git clone https://github.com/thelad-dev/unifi-people-pointer.git
+   cp -r unifi-people-pointer/custom_components/unifi_people_pointer \
+         /config/custom_components/
    ```
 
-2. **Oder ZIP herunterladen:**
-   - [Latest Release](https://github.com/thelad-dev/unifi-people-pointer/releases/latest) herunterladen
-   - Ins `custom_components`-Verzeichnis entpacken
+2. **Oder ZIP / Release herunterladen:**
+   - [Latest Release](https://github.com/thelad-dev/unifi-people-pointer/releases/latest) oder Repo-ZIP herunterladen
+   - Den Ordner `custom_components/unifi_people_pointer/` nach `/config/custom_components/unifi_people_pointer/` kopieren
 
 3. **Verzeichnisstruktur prüfen:**
    ```
@@ -40,9 +46,6 @@
        └── unifi_people_pointer/
            ├── __init__.py
            ├── manifest.json
-           ├── devices.json
-           ├── people.json
-           ├── manufacturers.json
            └── ...
    ```
 
@@ -81,8 +84,10 @@
 
 #### Integration erscheint nicht in HACS
 
+- Custom Repository zuerst hinzufügen (siehe oben); reine Suche im Default Store findet die Integration nicht
 - HACS-Cache leeren: HACS → ⋮ → Reload HACS
-- Repository-URL prüfen
+- Repository-URL prüfen: `https://github.com/thelad-dev/unifi-people-pointer`
+- Bei 404: Repo ist öffentlich; URL und Netzwerkzugriff prüfen
 - HACS-Logs prüfen: Settings → System → Logs
 
 #### API-Token funktioniert nicht
@@ -111,6 +116,8 @@ curl -sk -H "X-API-KEY: $unifi_api_token" \
 <a name="en"></a>
 ## 🇬🇧 Installation (English)
 
+This integration is **not** in the HACS default store. Install it via a **custom repository** or manually.
+
 ### Method 1: Installation via HACS (recommended)
 
 1. **Open HACS** in Home Assistant
@@ -121,21 +128,25 @@ curl -sk -H "X-API-KEY: $unifi_api_token" \
    - **Repository:** `https://github.com/thelad-dev/unifi-people-pointer`
    - **Category:** Integration
 6. Click **Add**
-7. Search for **UniFi People Pointer** in the integration list
+7. Find **UniFi People Pointer** in the (custom) integrations list
 8. Click **Download**
 9. **Restart Home Assistant**
 
+Note: Earlier 404 errors when adding the repository were often caused by the repo being private. The repository is now public.
+
 ### Method 2: Manual Installation
 
-1. **Clone repository:**
+1. **Copy from the repository:**
    ```bash
-   cd /config/custom_components
+   cd /tmp
    git clone https://github.com/thelad-dev/unifi-people-pointer.git
+   cp -r unifi-people-pointer/custom_components/unifi_people_pointer \
+         /config/custom_components/
    ```
 
-2. **Or download ZIP:**
-   - Download [Latest Release](https://github.com/thelad-dev/unifi-people-pointer/releases/latest)
-   - Extract to `custom_components` directory
+2. **Or download ZIP / release:**
+   - Download [Latest Release](https://github.com/thelad-dev/unifi-people-pointer/releases/latest) or the repo ZIP
+   - Copy the folder `custom_components/unifi_people_pointer/` to `/config/custom_components/unifi_people_pointer/`
 
 3. **Verify directory structure:**
    ```
@@ -144,9 +155,6 @@ curl -sk -H "X-API-KEY: $unifi_api_token" \
        └── unifi_people_pointer/
            ├── __init__.py
            ├── manifest.json
-           ├── devices.json
-           ├── people.json
-           ├── manufacturers.json
            └── ...
    ```
 
@@ -185,8 +193,10 @@ curl -sk -H "X-API-KEY: $unifi_api_token" \
 
 #### Integration not showing in HACS
 
+- Add the custom repository first (see above); searching the default store alone will not find this integration
 - Clear HACS cache: HACS → ⋮ → Reload HACS
-- Verify repository URL
+- Verify repository URL: `https://github.com/thelad-dev/unifi-people-pointer`
+- On 404: the repo is public; verify the URL and network access
 - Check HACS logs: Settings → System → Logs
 
 #### API token not working
