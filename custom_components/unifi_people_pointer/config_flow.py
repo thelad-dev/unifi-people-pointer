@@ -1,4 +1,5 @@
 """Config flow for UniFi People Pointer integration."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,11 +10,11 @@ from typing import Any
 
 import aiohttp
 import voluptuous as vol
-
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_TOKEN
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
+
 from .const import DEFAULT_VERIFY_SSL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -106,9 +107,7 @@ async def validate_api_connection(
                 if response.status in (401, 403):
                     raise PermissionError("Invalid API token")
                 if response.status >= 400:
-                    raise ConnectionError(
-                        f"UniFi API returned HTTP {response.status}"
-                    )
+                    raise ConnectionError(f"UniFi API returned HTTP {response.status}")
                 payload = await response.json(content_type=None)
     except (PermissionError, ConnectionError, TimeoutError):
         raise
@@ -128,8 +127,10 @@ async def validate_api_connection(
         if isinstance(data, list):
             for site in data:
                 if isinstance(site, dict):
-                    name = site.get("internalReference") or site.get("name") or site.get(
-                        "id"
+                    name = (
+                        site.get("internalReference")
+                        or site.get("name")
+                        or site.get("id")
                     )
                     if name:
                         sites.append(str(name))
@@ -147,7 +148,7 @@ class UniFiPeoplePointerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the initial user step."""
         errors: dict[str, str] = {}
 
@@ -189,9 +190,7 @@ class UniFiPeoplePointerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_reauth(
-        self, entry_data: dict[str, Any]
-    ) -> FlowResult:
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
         """Handle reauth when credentials are invalid."""
         entry_id = self.context.get("entry_id")
         if entry_id:
@@ -200,7 +199,7 @@ class UniFiPeoplePointerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Confirm reauthentication with a new API token."""
         errors: dict[str, str] = {}
 
@@ -247,7 +246,7 @@ class UniFiPeoplePointerOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)

@@ -212,10 +212,6 @@ When testing this integration:
 ### Issue: Events not firing
 **Solution:** Check debounce timeout (3min default), verify event_manager is initialized, check logs for event scheduling
 
-### Issue: Config flow 500 when adding integration
-**Cause:** Uncaught `NotImplementedError` in `async_step_user`.
-**Solution:** Config flow must show a form / create entry; never raise `NotImplementedError` on the setup path.
-
 ### Issue: Coordinator not found in services
 **Solution:** Verify `async_setup_entry()` stores coordinator in `hass.data[DOMAIN]`, check initialization order
 

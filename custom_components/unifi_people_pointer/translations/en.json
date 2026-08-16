@@ -36,12 +36,7 @@
         "title": "UniFi People Pointer Options",
         "description": "Configure polling and event settings",
         "data": {
-          "scan_interval": "Scan interval (seconds)",
-          "poll_interval": "Poll Interval (seconds)",
-          "grace_period": "Grace Period (seconds)",
-          "event_debounce": "Event Debounce (seconds)",
-          "enable_mobile_app_fallback": "Enable Mobile App Fallback",
-          "enable_ping_fallback": "Enable Ping Fallback"
+          "scan_interval": "Scan interval (seconds)"
         }
       }
     }
