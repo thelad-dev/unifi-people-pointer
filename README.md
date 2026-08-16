@@ -18,24 +18,32 @@ UniFi People Pointer ist eine fortschrittliche Home Assistant Integration, die P
 - **UniFi Native**: Direkte Integration mit UniFi Controller API
 - **Intelligente Events**: Automatische Benachrichtigungen bei Ankommen/Verlassen
 - **Unbekannte Geräte**: Warnung bei neuen Geräten im Netzwerk
-- **HACS Kompatibel**: Einfache Installation über Home Assistant Community Store
+- **HACS**: Installation als Custom Repository (noch nicht im HACS Default Store)
 - **Web-UI**: Optionales Web-Interface zur Verwaltung (in Entwicklung)
 
 #### 🚀 Installation
 
-##### Via HACS (empfohlen)
+Ausführliche Anleitung: [docs/installation.md](docs/installation.md)
+
+##### Via HACS (empfohlen) – Custom Repository
+
+Die Integration ist **nicht** im HACS Default Store. Suche allein findet sie nicht.
 
 1. Öffne HACS in Home Assistant
-2. Gehe zu "Integrationen"
-3. Klicke auf das `+` Icon
-4. Suche nach "UniFi People Pointer"
-5. Klicke auf "Installieren"
-6. Starte Home Assistant neu
+2. Gehe zu **Integrationen**
+3. ⋮-Menü (oben rechts) → **Custom repositories**
+4. Repository hinzufügen:
+   - **URL:** `https://github.com/thelad-dev/unifi-people-pointer`
+   - **Kategorie:** Integration
+5. **Add** → Integration herunterladen (**Download**)
+6. Home Assistant neu starten
+
+Hinweis: Frühere 404-Fehler beim Hinzufügen lagen oft am damals privaten Repo. Das Repo ist jetzt öffentlich.
 
 ##### Manuell
 
-1. Lade die neueste Version von [Releases](https://github.com/thelad-dev/unifi-people-pointer/releases) herunter
-2. Entpacke `unifi_people_pointer` nach `/config/custom_components/`
+1. Lade die neueste Version von [Releases](https://github.com/thelad-dev/unifi-people-pointer/releases) bzw. als ZIP vom Repo herunter
+2. Kopiere den Ordner `custom_components/unifi_people_pointer/` nach `/config/custom_components/unifi_people_pointer/`
 3. Starte Home Assistant neu
 
 #### ⚙️ Konfiguration
@@ -147,24 +155,32 @@ UniFi People Pointer is an advanced Home Assistant integration that tracks peopl
 - **UniFi Native**: Direct integration with UniFi Controller API
 - **Smart Events**: Automatic notifications for arrivals/departures
 - **Unknown Devices**: Alerts for new devices on the network
-- **HACS Compatible**: Easy installation via Home Assistant Community Store
+- **HACS**: Install via custom repository (not yet in the HACS default store)
 - **Web UI**: Optional web interface for management (in development)
 
 #### 🚀 Installation
 
-##### Via HACS (recommended)
+Full guide: [docs/installation.md](docs/installation.md)
+
+##### Via HACS (recommended) – custom repository
+
+This integration is **not** in the HACS default store. Searching alone will not find it.
 
 1. Open HACS in Home Assistant
-2. Go to "Integrations"
-3. Click the `+` icon
-4. Search for "UniFi People Pointer"
-5. Click "Install"
+2. Go to **Integrations**
+3. ⋮ menu (top right) → **Custom repositories**
+4. Add repository:
+   - **URL:** `https://github.com/thelad-dev/unifi-people-pointer`
+   - **Category:** Integration
+5. **Add** → download the integration (**Download**)
 6. Restart Home Assistant
+
+Note: Earlier 404 errors when adding the repository were often caused by the repo being private. The repository is now public.
 
 ##### Manual
 
-1. Download the latest version from [Releases](https://github.com/thelad-dev/unifi-people-pointer/releases)
-2. Extract `unifi_people_pointer` to `/config/custom_components/`
+1. Download the latest version from [Releases](https://github.com/thelad-dev/unifi-people-pointer/releases) or as a ZIP from the repo
+2. Copy the folder `custom_components/unifi_people_pointer/` to `/config/custom_components/unifi_people_pointer/`
 3. Restart Home Assistant
 
 #### ⚙️ Configuration

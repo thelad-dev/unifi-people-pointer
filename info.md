@@ -12,7 +12,7 @@
 
 ## Quick Start
 
-1. **Install** via HACS
+1. **Install** via HACS as a custom repository (`https://github.com/thelad-dev/unifi-people-pointer`, category Integration) — not in the HACS default store yet
 2. **Create API token** in UniFi Controller (Settings → Admins → Add Admin → View Only)
 3. **Configure `.env`** with your API token
 4. **Edit `devices.json`** and `people.json`** to define your devices and persons
