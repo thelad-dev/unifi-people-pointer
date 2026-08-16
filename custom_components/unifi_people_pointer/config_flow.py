@@ -59,6 +59,16 @@ def _is_valid_host(host: str) -> bool:
     return bool(_HOSTNAME_RE.match(host))
 
 
+def _host_for_url(host: str) -> str:
+    """Return host as an HTTP URL authority, bracketing IPv6 literals."""
+    try:
+        if ipaddress.ip_address(host).version == 6:
+            return f"[{host}]"
+    except ValueError:
+        pass
+    return host
+
+
 async def validate_api_connection(
     host: str, token: str, verify_ssl: bool
 ) -> dict[str, Any]:
@@ -71,7 +81,7 @@ async def validate_api_connection(
         PermissionError: Invalid API token (401/403).
         TimeoutError: Request timed out.
     """
-    url = f"https://{host}/proxy/network/integration/v1/sites"
+    url = f"https://{_host_for_url(host)}/proxy/network/integration/v1/sites"
     headers = {
         "Accept": "application/json",
         "X-API-KEY": token,

@@ -1,9 +1,13 @@
 """Unit tests for config flow."""
 import pytest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_HOST, CONF_TOKEN
 from homeassistant.core import HomeAssistant
+
+from custom_components.unifi_people_pointer.config_flow import (
+    validate_api_connection,
+)
 
 # Form schema uses api_token; entry data stores CONF_TOKEN (homeassistant.const).
 CONF_API_TOKEN = "api_token"
@@ -208,3 +212,51 @@ class TestConfigFlow:
         
         assert result["type"] == data_entry_flow.FlowResultType.ABORT
         assert result["reason"] == "reauth_successful"
+
+
+def _mock_sites_response() -> AsyncMock:
+    """Return an aiohttp response context that yields a sites payload."""
+    response = AsyncMock()
+    response.status = 200
+    response.json = AsyncMock(return_value={"data": [{"name": "default"}]})
+    response.__aenter__.return_value = response
+    response.__aexit__.return_value = False
+    return response
+
+
+@pytest.mark.unit
+class TestValidateApiConnectionUrl:
+    """Test UniFi API URL construction for accepted host forms."""
+
+    @pytest.mark.parametrize(
+        ("host", "expected_netloc"),
+        [
+            ("2001:db8::1", "[2001:db8::1]"),
+            ("fe80::1", "[fe80::1]"),
+            ("192.168.88.1", "192.168.88.1"),
+            ("unifi.local", "unifi.local"),
+        ],
+    )
+    async def test_builds_https_url_with_ipv6_brackets(
+        self, host: str, expected_netloc: str
+    ) -> None:
+        """IPv6 hosts are bracketed; IPv4 and hostnames are unchanged."""
+        response = _mock_sites_response()
+        session = MagicMock()
+        session.get.return_value = response
+        session.__aenter__ = AsyncMock(return_value=session)
+        session.__aexit__ = AsyncMock(return_value=False)
+
+        with patch(
+            "custom_components.unifi_people_pointer.config_flow.aiohttp.ClientSession",
+            return_value=session,
+        ):
+            result = await validate_api_connection(host, "token", False)
+
+        session.get.assert_called_once()
+        requested_url = session.get.call_args.args[0]
+        assert requested_url == (
+            f"https://{expected_netloc}/proxy/network/integration/v1/sites"
+        )
+        assert result == {"sites": ["default"]}
+
