@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        # Home Assistant 2024.1+ requires Python >=3.11
+        python-version: ['3.11', '3.12']
     
     steps:
     - uses: actions/checkout@v4
@@ -36,15 +37,15 @@ jobs:
     
     - name: Run unit tests
       run: |
-        pytest tests/unit -v --cov=custom_components.unifi_people_pointer --cov-report=xml --cov-report=term-missing
+        pytest tests/unit -v --cov=custom_components.unifi_people_pointer --cov-config=.coveragerc --cov-report=xml --cov-report=term-missing
     
     - name: Run integration tests
       run: |
-        pytest tests/integration -v --cov=custom_components.unifi_people_pointer --cov-append --cov-report=xml --cov-report=term-missing
+        pytest tests/integration -v --cov=custom_components.unifi_people_pointer --cov-config=.coveragerc --cov-append --cov-report=xml --cov-report=term-missing
     
     - name: Check coverage threshold
       run: |
-        coverage report --fail-under=80
+        coverage report --rcfile=.coveragerc --fail-under=80
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -74,7 +75,7 @@ jobs:
       run: black --check custom_components/ tests/
     
     - name: Run isort
-      run: isort --check-only custom_components/ tests/
+      run: isort --profile black --check-only custom_components/ tests/
     
     - name: Run flake8
       run: flake8 custom_components/ tests/ --max-line-length=120 --extend-ignore=E203,W503

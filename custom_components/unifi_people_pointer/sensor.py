@@ -1,8 +1,9 @@
 """Sensor platform for UniFi People Pointer."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
@@ -83,24 +84,26 @@ class UniFiUnknownClientsSensor(CoordinatorEntity, SensorEntity):
         """Handle updated data from the coordinator."""
         # TODO: Implement unknown client detection
         # For now, keep empty list
-        
+
         # Auto-dismiss old clients
         self._auto_dismiss_old_clients()
-        
+
         self.async_write_ha_state()
 
     def _auto_dismiss_old_clients(self) -> None:
         """Auto-dismiss unknown clients after configured days."""
         cutoff = datetime.now() - timedelta(days=AUTO_DISMISS_DAYS)
-        
+
         original_count = len(self._unknown_clients)
         self._unknown_clients = [
             client
             for client in self._unknown_clients
-            if datetime.fromisoformat(client.get("first_seen", datetime.now().isoformat()))
+            if datetime.fromisoformat(
+                client.get("first_seen", datetime.now().isoformat())
+            )
             > cutoff
         ]
-        
+
         dismissed_count = original_count - len(self._unknown_clients)
         if dismissed_count > 0:
             _LOGGER.info(
@@ -157,5 +160,5 @@ class UniFiGuestClientsSensor(CoordinatorEntity, SensorEntity):
         """Handle updated data from the coordinator."""
         # TODO: Implement guest client detection from UniFi API
         # For now, keep empty list
-        
+
         self.async_write_ha_state()
