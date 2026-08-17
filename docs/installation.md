@@ -223,3 +223,15 @@ curl -sk -H "X-API-KEY: $unifi_api_token" \
 ---
 
 **[⬆️ Back to README](../README.md)**
+
+## SSL / lokaler Controller
+
+UniFi OS liefert lokal fast immer ein **selbstsigniertes** Zertifikat.
+Die Integration setzt **„SSL-Zertifikat prüfen“ standardmäßig auf aus**.
+
+Schnelltest:
+
+```bash
+curl -sk -H "X-API-KEY: $unifi_api_token" -H "Accept: application/json"   "https://192.168.88.1/proxy/network/integration/v1/sites"
+```
+
