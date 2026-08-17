@@ -3,11 +3,11 @@
     "step": {
       "user": {
         "title": "UniFi People Pointer Setup",
-        "description": "Set up UniFi People Pointer for person-based presence tracking",
+        "description": "Host = controller LAN IP or hostname (e.g. 192.168.88.1). API token from UniFi OS → Settings → Control Plane → Integrations. Local UniFi uses a self-signed cert — SSL verification is off by default.",
         "data": {
           "host": "UniFi Controller host",
           "api_token": "API token",
-          "verify_ssl": "Verify SSL certificate"
+          "verify_ssl": "Verify SSL certificate (only if you use a trusted public hostname/cert)"
         }
       },
       "reauth_confirm": {
@@ -23,7 +23,8 @@
       "invalid_auth": "Invalid authentication",
       "invalid_host": "Invalid host (use an IP address or hostname)",
       "timeout": "Connection to UniFi Controller timed out",
-      "unknown": "Unexpected error occurred"
+      "unknown": "Unexpected error occurred",
+      "ssl_error": "SSL certificate error. For a local controller/IP leave “Verify SSL certificate” disabled (default)."
     },
     "abort": {
       "already_configured": "UniFi People Pointer is already configured",

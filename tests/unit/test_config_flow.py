@@ -262,3 +262,21 @@ class TestValidateApiConnectionUrl:
             f"https://{expected_netloc}/proxy/network/integration/v1/sites"
         )
         assert result == {"sites": ["default"]}
+
+def test_default_verify_ssl_is_false():
+    from custom_components.unifi_people_pointer.const import DEFAULT_VERIFY_SSL
+
+    assert DEFAULT_VERIFY_SSL is False
+
+
+def test_ssl_connection_error_maps_to_ssl_error():
+    from custom_components.unifi_people_pointer.config_flow import (
+        _map_api_exception_to_flow_error,
+    )
+
+    assert (
+        _map_api_exception_to_flow_error(
+            ConnectionError("SSL certificate error: hostname mismatch")
+        )
+        == "ssl_error"
+    )

@@ -3,11 +3,11 @@
     "step": {
       "user": {
         "title": "UniFi People Pointer Einrichtung",
-        "description": "Richte UniFi People Pointer für personenbasiertes Presence Tracking ein",
+        "description": "Host = LAN-IP oder Hostname des Controllers (z. B. 192.168.88.1). API-Token unter UniFi OS → Einstellungen → Kontrollfluss → Integrationen. Lokales UniFi nutzt ein selbstsigniertes Zertifikat — SSL-Prüfung ist standardmäßig aus.",
         "data": {
           "host": "UniFi Controller Host",
           "api_token": "API-Token",
-          "verify_ssl": "SSL-Zertifikat prüfen"
+          "verify_ssl": "SSL-Zertifikat prüfen (nur bei vertrauenswürdigem öffentlichem Hostnamen/Zertifikat)"
         }
       },
       "reauth_confirm": {
@@ -23,7 +23,8 @@
       "invalid_auth": "Ungültige Authentifizierung",
       "invalid_host": "Ungültiger Host (IP-Adresse oder Hostname verwenden)",
       "timeout": "Zeitüberschreitung bei Verbindung zum UniFi Controller",
-      "unknown": "Unerwarteter Fehler aufgetreten"
+      "unknown": "Unerwarteter Fehler aufgetreten",
+      "ssl_error": "SSL-Zertifikatsfehler. Bei lokalem Controller/IP „SSL-Zertifikat prüfen“ deaktiviert lassen (Standard)."
     },
     "abort": {
       "already_configured": "UniFi People Pointer ist bereits konfiguriert",
