@@ -77,7 +77,14 @@ def _map_api_exception_to_flow_error(err: BaseException) -> str:
     if isinstance(err, TimeoutError):
         return "timeout"
     if isinstance(err, ConnectionError):
+        msg = str(err).lower()
+        if "certificate" in msg or "ssl" in msg or "tls" in msg:
+            return "ssl_error"
         return "cannot_connect"
+    # aiohttp SSL failures often surface as ClientConnectorCertificateError
+    err_name = type(err).__name__.lower()
+    if "ssl" in err_name or "certificate" in err_name:
+        return "ssl_error"
     _LOGGER.exception("Unexpected config flow error")
     return "unknown"
 
@@ -101,9 +108,15 @@ async def validate_api_connection(
     }
     timeout = aiohttp.ClientTimeout(total=15)
 
+    # Local UniFi gateways almost always present a self-signed cert that does not
+    # match the LAN IP/hostname. When verify_ssl is False, disable TLS verification.
+    ssl_param: bool | object = verify_ssl
+    if not verify_ssl:
+        ssl_param = False
+
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url, headers=headers, ssl=verify_ssl) as response:
+            async with session.get(url, headers=headers, ssl=ssl_param) as response:
                 if response.status in (401, 403):
                     raise PermissionError("Invalid API token")
                 if response.status >= 400:
@@ -114,6 +127,12 @@ async def validate_api_connection(
     except asyncio.TimeoutError as err:
         raise TimeoutError("Request timed out") from err
     except aiohttp.ClientConnectorError as err:
+        msg = str(err)
+        low = msg.lower()
+        if "certificate" in low or "ssl" in low or "tls" in low:
+            raise ConnectionError(
+                f"SSL certificate error (disable SSL verification for local UniFi): {err}"
+            ) from err
         raise ConnectionError(f"Cannot connect to UniFi controller: {err}") from err
     except aiohttp.ClientError as err:
         raise ConnectionError(f"Cannot connect to UniFi controller: {err}") from err
