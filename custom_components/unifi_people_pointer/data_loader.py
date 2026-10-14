@@ -108,10 +108,13 @@ def validate_person(person: dict[str, Any]) -> bool:
         if not isinstance(ha_person, str) or not ha_person.startswith("person."):
             return False
     device_ids = person.get("device_ids")
-    if device_ids is not None:
-        return isinstance(device_ids, list)
-    # Alternate schema: primary_device MAC
-    return bool(person.get("primary_device"))
+    if device_ids is not None and not isinstance(device_ids, list):
+        return False
+    secondaries = person.get("secondary_devices")
+    if secondaries is not None and not isinstance(secondaries, list):
+        return False
+    # id is enough; ownership lists may be empty after exclusive moves.
+    return True
 
 
 def validate_person_devices(

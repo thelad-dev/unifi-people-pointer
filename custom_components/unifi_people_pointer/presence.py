@@ -56,17 +56,23 @@ def determine_presence(
         if not person_id:
             continue
         device_ids = list(person.get("device_ids") or [])
-        # Alternate schema: primary/secondary MAC lists
-        if not device_ids and person.get("primary_device"):
-            macs = [person["primary_device"], *person.get("secondary_devices", [])]
-            for device in devices:
-                device_id = device.get("id") if isinstance(device, dict) else None
-                if not device_id:
-                    continue
-                if normalize_mac(str(device.get("mac") or "")) in {
-                    normalize_mac(str(m)) for m in macs
-                }:
-                    device_ids.append(device_id)
+        # Alternate schema: primary/secondary MAC lists (either may be set).
+        if not device_ids:
+            macs: list[Any] = []
+            primary = person.get("primary_device")
+            if primary:
+                macs.append(primary)
+            secondaries = person.get("secondary_devices") or []
+            if isinstance(secondaries, list):
+                macs.extend(secondaries)
+            if macs:
+                wanted = {normalize_mac(str(m)) for m in macs if m}
+                for device in devices:
+                    device_id = device.get("id") if isinstance(device, dict) else None
+                    if not device_id:
+                        continue
+                    if normalize_mac(str(device.get("mac") or "")) in wanted:
+                        device_ids.append(device_id)
 
         online_for_person = [d for d in device_ids if d in online_ids]
         is_home = len(online_for_person) > 0

@@ -580,15 +580,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             other_ids = list(other.get("device_ids") or [])
             if device_id in other_ids:
                 other["device_ids"] = [i for i in other_ids if i != device_id]
-            if normalize_mac(str(other.get("primary_device") or "")) == mac_n:
-                other["primary_device"] = None
-            secondaries = other.get("secondary_devices")
-            if isinstance(secondaries, list):
-                other["secondary_devices"] = [
-                    m
-                    for m in secondaries
-                    if normalize_mac(str(m or "")) != mac_n
-                ]
+            self._detach_mac_from_person(other, mac_n)
         ids = [i for i in (target.get("device_ids") or []) if i != device_id]
         if device_type == "primary":
             ids.insert(0, device_id)
@@ -644,6 +636,28 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.hass.async_add_executor_job(self._remove_device_sync, mac)
             await self.async_request_refresh()
 
+    @staticmethod
+    def _detach_mac_from_person(person: dict[str, Any], mac_n: str) -> None:
+        """Remove a MAC from primary/secondary ownership and keep person valid."""
+        primary_n = normalize_mac(str(person.get("primary_device") or ""))
+        secondaries = person.get("secondary_devices")
+        if not isinstance(secondaries, list):
+            secondaries = []
+        kept_secondaries = [
+            m for m in secondaries if normalize_mac(str(m or "")) != mac_n
+        ]
+        if primary_n == mac_n:
+            if kept_secondaries:
+                person["primary_device"] = kept_secondaries[0]
+                person["secondary_devices"] = kept_secondaries[1:]
+            else:
+                person["primary_device"] = None
+                if "secondary_devices" in person or secondaries:
+                    person["secondary_devices"] = []
+            return
+        if "secondary_devices" in person or kept_secondaries != list(secondaries):
+            person["secondary_devices"] = kept_secondaries
+
     def _remove_device_sync(self, mac: str) -> None:
         mac_n = normalize_mac(mac)
         devices_data = self._loader.get_devices()
@@ -662,6 +676,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for person in people_data.get("people") or []:
             ids = [i for i in (person.get("device_ids") or []) if i not in removed_ids]
             person["device_ids"] = ids
+            self._detach_mac_from_person(person, mac_n)
         self._write_json(self.storage_path / PEOPLE_FILE, people_data)
         self._loader.reload()
 
