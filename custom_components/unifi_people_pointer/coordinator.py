@@ -309,9 +309,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                                 return payload["data"]
                         elif isinstance(payload, list):
                             return payload
-            except (PermissionError, asyncio.TimeoutError):
+            except PermissionError:
                 raise
-            except (aiohttp.ClientError, ValueError, TypeError) as err:
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError) as err:
                 _LOGGER.debug("Classic sta endpoint failed: %s", err)
 
             # Integration API fallback.
@@ -502,6 +502,24 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             seeds.append(name)
         return seeds
 
+    @staticmethod
+    def _merge_hostname_match(
+        existing: list[Any] | None, seeds: list[str]
+    ) -> list[str]:
+        """Merge seeds into hostname_match without wiping existing tokens."""
+        current = [
+            str(p).strip() for p in (existing or []) if str(p).strip()
+        ]
+        if not seeds:
+            return current
+        if not current:
+            return list(seeds)
+        merged = list(current)
+        for seed in seeds:
+            if seed not in merged:
+                merged.append(seed)
+        return merged
+
     def _assign_device_sync(
         self,
         mac: str,
@@ -534,19 +552,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             existing["track"] = True
             if device_name:
                 existing["name"] = device_name
-            current = [
-                str(p).strip()
-                for p in (existing.get("hostname_match") or [])
-                if str(p).strip()
-            ]
-            if not current and seeds:
-                existing["hostname_match"] = list(seeds)
-            elif seeds:
-                merged = list(current)
-                for seed in seeds:
-                    if seed not in merged:
-                        merged.append(seed)
-                existing["hostname_match"] = merged
+            existing["hostname_match"] = self._merge_hostname_match(
+                existing.get("hostname_match"), seeds
+            )
         devices_data["devices"] = devices
         self._write_json(self.storage_path / DEVICES_FILE, devices_data)
 
@@ -561,6 +569,13 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             }
             people.append(target)
             people_data["people"] = people
+        # Exclusive ownership: detach from every other person first.
+        for other in people:
+            if other is target:
+                continue
+            other_ids = list(other.get("device_ids") or [])
+            if device_id in other_ids:
+                other["device_ids"] = [i for i in other_ids if i != device_id]
         ids = [i for i in (target.get("device_ids") or []) if i != device_id]
         if device_type == "primary":
             ids.insert(0, device_id)
@@ -583,11 +598,15 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         mac_n = normalize_mac(mac)
         devices_data = self._loader.get_devices()
         devices = list(devices_data.get("devices") or [])
+        seeds = self._hostname_match_seeds(mac_n, name)
         for device in devices:
             if normalize_mac(str(device.get("mac") or "")) == mac_n:
                 device["track"] = True
                 device["name"] = name
                 device["type"] = device_type
+                device["hostname_match"] = self._merge_hostname_match(
+                    device.get("hostname_match"), seeds
+                )
                 self._write_json(self.storage_path / DEVICES_FILE, devices_data)
                 self._loader.reload()
                 return
@@ -597,7 +616,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "name": name,
                 "type": device_type,
                 "mac": mac_n,
-                "hostname_match": [name] if name else [],
+                "hostname_match": list(seeds),
                 "track": True,
             }
         )
