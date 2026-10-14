@@ -295,12 +295,19 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         raise PermissionError("Invalid API token")
                     if response.status < 400:
                         payload = await response.json(content_type=None)
-                        if isinstance(payload, dict) and isinstance(
-                            payload.get("data"), list
-                        ):
-                            # Empty list is a valid live snapshot (all offline).
-                            return payload["data"]
-                        if isinstance(payload, list):
+                        if isinstance(payload, dict):
+                            meta_rc = str(
+                                (payload.get("meta") or {}).get("rc") or ""
+                            ).lower()
+                            if meta_rc == "error":
+                                _LOGGER.debug(
+                                    "Classic sta meta.rc=error (%s); trying integration API",
+                                    (payload.get("meta") or {}).get("msg"),
+                                )
+                            elif isinstance(payload.get("data"), list):
+                                # Empty list with ok/absent rc is all-offline.
+                                return payload["data"]
+                        elif isinstance(payload, list):
                             return payload
             except (PermissionError, asyncio.TimeoutError):
                 raise
