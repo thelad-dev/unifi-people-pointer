@@ -26,6 +26,8 @@ from .const import (
     DEFAULT_VERIFY_SSL,
     DEVICES_FILE,
     DOMAIN,
+    EVENT_DEVICE_CONNECTED,
+    EVENT_UNKNOWN_DEVICE,
     MANUFACTURERS_FILE,
     PEOPLE_FILE,
     STATE_AWAY,
@@ -80,6 +82,11 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             people_path=storage / PEOPLE_FILE,
         )
         self._clients_by_mac: dict[str, dict[str, Any]] = {}
+        self._all_clients: list[dict[str, Any]] = []
+        self._online_device_ids_cache: set[str] = set()
+        self._devices_by_id: dict[str, dict[str, Any]] = {}
+        self._device_by_configured_mac: dict[str, dict[str, Any]] = {}
+        self._device_event_macs: dict[str, str] = {}
         self._presence_by_person: dict[str, dict[str, Any]] = {}
         self._site_id: str | None = None
         self._site_key: str = "default"
@@ -118,22 +125,31 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Keep wired too for matching, but presence mainly cares about wireless phones.
         all_clients = clients
 
+        self._all_clients = all_clients
         self._clients_by_mac = {
             c["mac"]: c for c in all_clients if c.get("mac")
         }
+        devices = self.devices
+        self._devices_by_id = {
+            d["id"]: d for d in devices if isinstance(d, dict) and d.get("id")
+        }
+        self._device_by_configured_mac = {
+            normalize_mac(str(d.get("mac") or "")): d
+            for d in devices
+            if isinstance(d, dict) and d.get("mac")
+        }
 
-        presence_rows = determine_presence(self.people, self.devices, all_clients)
+        presence_rows = determine_presence(self.people, devices, all_clients)
         previous = self._presence_by_person
         self._presence_by_person = {row["id"]: row for row in presence_rows}
-        now_online_ids = _online_device_ids(self.devices, all_clients)
+        now_online_ids = _online_device_ids(devices, all_clients)
+        self._online_device_ids_cache = now_online_ids
 
         unknown = []
-        known_macs = {
-            normalize_mac(str(d.get("mac") or "")) for d in self.devices
-        }
+        known_macs = set(self._device_by_configured_mac)
         for client in wireless:
-            matched = match_device(client, self.devices) or match_device_partial(
-                client, self.devices
+            matched = match_device(client, devices) or match_device_partial(
+                client, devices
             )
             if matched is None and client["mac"] not in known_macs:
                 unknown.append(client)
@@ -147,41 +163,57 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 now_home = row.get("is_home")
                 if was is None or was == now_home:
                     continue
-                device = ""
+                device_mac = ""
                 online_ids = row.get("online_device_ids") or []
-                if online_ids:
-                    device = str(online_ids[0])
-                elif previous.get(person_id, {}).get("online_device_ids"):
-                    device = str(previous[person_id]["online_device_ids"][0])
+                source_ids = online_ids or (
+                    previous.get(person_id, {}).get("online_device_ids") or []
+                )
+                if source_ids:
+                    device_mac = self._mac_for_device_id(str(source_ids[0]))
                 if now_home:
-                    event_manager.fire_person_arrived(person=person_id, device=device)
+                    event_manager.fire_person_arrived(
+                        person=person_id, device=device_mac
+                    )
                 else:
-                    event_manager.fire_person_left(person=person_id, device=device)
+                    event_manager.fire_person_left(
+                        person=person_id, device=device_mac
+                    )
 
-            devices_by_id = {
-                d["id"]: d for d in self.devices if isinstance(d, dict) and d.get("id")
-            }
             for device_id in now_online_ids - self._prev_online_device_ids:
-                device = devices_by_id.get(device_id) or {}
-                mac = normalize_mac(str(device.get("mac") or ""))
+                device = self._devices_by_id.get(device_id) or {}
+                client = self._live_client_for_device(device)
+                mac = ""
+                if client and client.get("mac"):
+                    mac = str(client["mac"])
+                else:
+                    mac = normalize_mac(str(device.get("mac") or ""))
+                if not mac:
+                    mac = str(device_id)
+                self._device_event_macs[device_id] = mac
                 person_id = None
                 for person in self.people:
                     if device_id in (person.get("device_ids") or []):
                         person_id = person.get("id")
                         break
-                client = self._clients_by_mac.get(mac) if mac else None
                 signal = None
                 if client is not None:
                     signal = client.get("signal")
                     if signal is None:
                         signal = client.get("signal_strength")
                 event_manager.fire_device_connected(
-                    mac=mac or str(device_id),
+                    mac=mac,
                     person=person_id,
                     device_type=device.get("type"),
                     ap_name=(client or {}).get("ap_mac"),
                     signal_strength=signal if isinstance(signal, int) else None,
                 )
+
+            for device_id in self._prev_online_device_ids - now_online_ids:
+                mac = self._device_event_macs.pop(device_id, None)
+                if not mac:
+                    device = self._devices_by_id.get(device_id) or {}
+                    mac = normalize_mac(str(device.get("mac") or "")) or str(device_id)
+                event_manager.cancel_device_event(mac, EVENT_DEVICE_CONNECTED)
 
             unknown_by_mac = {c["mac"]: c for c in unknown if c.get("mac")}
             for mac in now_unknown_macs - self._prev_unknown_macs:
@@ -196,6 +228,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     ap_name=client.get("ap_mac"),
                     signal_strength=signal if isinstance(signal, int) else None,
                 )
+
+            for mac in self._prev_unknown_macs - now_unknown_macs:
+                event_manager.cancel_device_event(mac, EVENT_UNKNOWN_DEVICE)
 
         self._prev_online_device_ids = now_online_ids
         self._prev_unknown_macs = now_unknown_macs
@@ -304,15 +339,49 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     return site_id, str(site_key)
         raise ConnectionError("No UniFi site id found")
 
+    def _live_client_for_device(
+        self, device: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
+        """Return the live UniFi client matching a configured device."""
+        if not device:
+            return None
+        alone = [device]
+        for client in self._all_clients:
+            if match_device(client, alone) or match_device_partial(client, alone):
+                return client
+        return None
+
+    def _mac_for_device_id(self, device_id: str) -> str:
+        """Resolve a device id to a live or configured MAC."""
+        device = self._devices_by_id.get(device_id)
+        if not device:
+            return ""
+        client = self._live_client_for_device(device)
+        if client and client.get("mac"):
+            return str(client["mac"])
+        return normalize_mac(str(device.get("mac") or ""))
+
     def is_device_online(self, mac: str) -> bool:
-        """Return True if MAC is present in the latest client list."""
-        return normalize_mac(mac) in self._clients_by_mac
+        """Return True if configured MAC is online via MAC or hostname match."""
+        mac_n = normalize_mac(mac)
+        if mac_n in self._clients_by_mac:
+            return True
+        device = self._device_by_configured_mac.get(mac_n)
+        if not device:
+            return False
+        device_id = device.get("id")
+        return bool(device_id and device_id in self._online_device_ids_cache)
 
     is_device_connected = is_device_online
 
     def async_get_client_by_mac(self, mac: str) -> dict[str, Any] | None:
-        """Return normalized client dict for MAC if online."""
-        return self._clients_by_mac.get(normalize_mac(mac))
+        """Return live client for a configured MAC (direct or hostname match)."""
+        mac_n = normalize_mac(mac)
+        direct = self._clients_by_mac.get(mac_n)
+        if direct is not None:
+            return direct
+        device = self._device_by_configured_mac.get(mac_n)
+        return self._live_client_for_device(device)
 
     def get_device_signal(self, mac: str) -> int | None:
         """Return signal strength in dBm for an online device MAC."""
@@ -346,12 +415,10 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not row or not row.get("is_home"):
             return None
         for device_id in row.get("online_device_ids") or []:
-            for device in self.devices:
-                if device.get("id") == device_id:
-                    mac = normalize_mac(str(device.get("mac") or ""))
-                    client = self._clients_by_mac.get(mac)
-                    if client and client.get("ap_mac"):
-                        return str(client.get("ap_mac"))
+            device = self._devices_by_id.get(str(device_id))
+            client = self._live_client_for_device(device)
+            if client and client.get("ap_mac"):
+                return str(client.get("ap_mac"))
         return None
 
     def get_person_devices(self, person_id: str) -> dict[str, Any]:
@@ -360,8 +427,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         online = set(row.get("online_device_ids") or [])
         enriched: list[dict[str, Any]] = []
         for device in row.get("devices") or []:
-            mac = normalize_mac(str(device.get("mac") or ""))
-            client = self._clients_by_mac.get(mac)
+            client = self._live_client_for_device(device)
             enriched.append(
                 {
                     **device,
