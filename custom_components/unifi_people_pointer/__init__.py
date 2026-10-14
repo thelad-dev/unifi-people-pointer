@@ -68,10 +68,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
         # Drop shared pointers when no entries remain.
+        shared_keys = (
+            "coordinator",
+            "event_manager",
+            "services_registered",
+            "unknown_first_seen",
+        )
         remaining = [
             key
             for key in hass.data.get(DOMAIN, {})
-            if key not in ("coordinator", "event_manager", "services_registered")
+            if key not in shared_keys
         ]
         if not remaining:
             event_manager = hass.data.get(DOMAIN, {}).get("event_manager")
@@ -79,6 +85,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 event_manager.cancel_all()
             if hass.data.get(DOMAIN, {}).get("services_registered"):
                 unregister_services(hass)
-            hass.data.pop(DOMAIN, None)
+            # Keep unknown_first_seen across config-entry reload.
+            first_seen = hass.data.get(DOMAIN, {}).get("unknown_first_seen") or {}
+            hass.data[DOMAIN] = {"unknown_first_seen": first_seen}
 
     return unload_ok

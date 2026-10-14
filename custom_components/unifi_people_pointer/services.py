@@ -151,6 +151,7 @@ def setup_services(hass: HomeAssistant) -> None:
         try:
             await coordinator.remove_device(mac)
             _LOGGER.info("Successfully removed device %s", mac)
+            await _async_reload_entry(hass, coordinator)
         except Exception as err:
             _LOGGER.error("Error removing device: %s", err)
             raise HomeAssistantError(f"Failed to remove device: {err}") from err

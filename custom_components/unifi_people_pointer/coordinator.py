@@ -208,7 +208,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             return payload
             except (PermissionError, asyncio.TimeoutError):
                 raise
-            except aiohttp.ClientError as err:
+            except (aiohttp.ClientError, ValueError, TypeError) as err:
                 _LOGGER.debug("Classic sta endpoint failed: %s", err)
 
             # Integration API fallback.
