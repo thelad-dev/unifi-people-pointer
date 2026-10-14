@@ -176,7 +176,7 @@ class TestDeviceMatcher:
         assert manufacturer is None
 
     def test_friendly_name_exact_match_only(self):
-        """Device display name matches hostname exactly, never as substring."""
+        """Display name is exact identity only when hostname_match is empty."""
         from custom_components.unifi_people_pointer.device_matcher import (
             match_device,
             match_device_partial,
@@ -187,7 +187,7 @@ class TestDeviceMatcher:
                 "id": "jan-phone",
                 "name": "iPhone",
                 "mac": "aa:bb:cc:dd:ee:01",
-                "hostname_match": ["iPhone-JD"],
+                "hostname_match": [],
                 "track": True,
             },
             {
@@ -211,6 +211,34 @@ class TestDeviceMatcher:
         )
         assert partial is not None
         assert partial["id"] == "seb-phone"
+
+    def test_name_tier_skips_devices_with_hostname_match(self):
+        """Name equality must not dual-home when peer uses empty hostname_match."""
+        from custom_components.unifi_people_pointer.device_matcher import (
+            exact_matching_devices,
+        )
+        from custom_components.unifi_people_pointer.presence import _online_device_ids
+
+        devices = [
+            {
+                "id": "seb",
+                "name": "Pixel-6",
+                "mac": "aa:bb:cc:dd:ee:10",
+                "hostname_match": [],
+                "track": True,
+            },
+            {
+                "id": "jan",
+                "name": "Pixel-6",
+                "mac": "aa:bb:cc:dd:ee:11",
+                "hostname_match": ["iPhone-JD"],
+                "track": True,
+            },
+        ]
+        client = {"mac": "11:22:33:44:55:66", "hostname": "Pixel-6"}
+        hits = exact_matching_devices(client, devices)
+        assert [d["id"] for d in hits] == ["seb"]
+        assert _online_device_ids(devices, [client]) == {"seb"}
 
     def test_name_exact_yields_to_peer_hostname_match(self):
         """hostname_match identity beats a peer display-name equality."""

@@ -488,10 +488,10 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return None
 
     def is_device_online(self, mac: str) -> bool:
-        """Return True if a still-configured device MAC is online."""
+        """Return True if a still-configured tracked device MAC is online."""
         mac_n = normalize_mac(mac)
         device = self._device_by_configured_mac.get(mac_n)
-        if not device:
+        if not device or not is_tracked(device):
             return False
         if mac_n in self._clients_by_mac:
             return True
@@ -554,10 +554,11 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         enriched: list[dict[str, Any]] = []
         for device in row.get("devices") or []:
             client = self._live_client_for_device(device)
+            device_id = device.get("id")
             enriched.append(
                 {
                     **device,
-                    "connected": device.get("id") in online or bool(client),
+                    "connected": bool(device_id and device_id in online),
                     "client": client,
                 }
             )

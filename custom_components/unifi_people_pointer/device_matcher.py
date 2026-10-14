@@ -61,6 +61,8 @@ def exact_matching_devices(
 
     name_hits: list[dict[str, Any]] = []
     for device in candidates:
+        if normalize_hostname_match(device.get("hostname_match")):
+            continue
         name = str(device.get("name") or "").strip().lower()
         if name and name == host_l:
             name_hits.append(device)

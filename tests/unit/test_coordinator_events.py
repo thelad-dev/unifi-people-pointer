@@ -309,3 +309,27 @@ async def test_integration_nonlist_payload_keeps_last_good(hass, tmp_path) -> No
     data = await coordinator._async_update_data()
     assert coordinator.get_person_state("janine") == "home"
     assert data["clients"]
+
+
+async def test_untracked_mac_not_online(hass, tmp_path) -> None:
+    """track:false devices stay offline for is_device_online and connected flags."""
+    coordinator = await _make_coordinator(hass, tmp_path=tmp_path)
+    mac = "aa:bb:cc:dd:ee:40"
+    device = {
+        "id": "galaxy-tab",
+        "name": "Tab",
+        "mac": mac,
+        "type": "tablet",
+        "track": False,
+        "hostname_match": [],
+    }
+    people = [{"id": "janine", "name": "Janine", "device_ids": ["galaxy-tab"]}]
+    _set_config(coordinator, people=people, devices=[device])
+    coordinator._rebuild_presence_state([_client(mac, hostname="galaxy")])
+
+    assert coordinator.get_person_state("janine") == "away"
+    assert coordinator.is_device_online(mac) is False
+    person_devices = coordinator.get_person_devices("janine")
+    primary = person_devices.get("primary") or {}
+    assert primary.get("connected") is False
+    _stop_coordinator(coordinator)
