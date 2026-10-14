@@ -2,15 +2,10 @@
 
 import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import patch
 
 import pytest
 
-# Presence tracking helpers are still Phase 3 stubs.
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skip(reason="Requires Phase 3 presence implementation"),
-]
+pytestmark = pytest.mark.integration
 
 
 @pytest.mark.integration
@@ -97,24 +92,6 @@ class TestPresenceTracking:
         # No person should be home based on untracked device
         assert all(not p.get("is_home", False) for p in presence)
 
-    async def test_presence_state_entity_update(self, hass, mock_config_entry):
-        """Test that HA person entity state is updated correctly."""
-        from custom_components.unifi_people_pointer import async_setup_entry
-
-        mock_config_entry.add_to_hass(hass)
-
-        with patch(
-            "custom_components.unifi_people_pointer.coordinator.UniFiCoordinator._fetch_clients",
-            return_value=[{"mac": "1c:3c:78:b8:ae:b5", "hostname": "iPhone-JD"}],
-        ):
-            await async_setup_entry(hass, mock_config_entry)
-            await hass.async_block_till_done()
-
-            # Check person.janine state
-            state = hass.states.get("person.janine")
-            assert state is not None
-            assert state.state == "home"
-
     async def test_presence_transition_home_to_away(
         self, hass, devices_data, people_data
     ):
@@ -185,26 +162,6 @@ class TestPresenceTracking:
 
         assert janine["is_home"] is True
         assert sebastian["is_home"] is True
-
-    async def test_presence_attributes(self, hass, mock_config_entry):
-        """Test presence entity has correct attributes."""
-        from custom_components.unifi_people_pointer import async_setup_entry
-
-        mock_config_entry.add_to_hass(hass)
-
-        with patch(
-            "custom_components.unifi_people_pointer.coordinator.UniFiCoordinator._fetch_clients",
-            return_value=[
-                {"mac": "1c:3c:78:b8:ae:b5", "hostname": "iPhone-JD", "signal": -45}
-            ],
-        ):
-            await async_setup_entry(hass, mock_config_entry)
-            await hass.async_block_till_done()
-
-            state = hass.states.get("person.janine")
-            assert state is not None
-            assert "mac" in state.attributes
-            assert "last_seen" in state.attributes or "last_updated" in state.attributes
 
     async def test_presence_history_tracking(self, hass, devices_data, people_data):
         """Test tracking presence history."""

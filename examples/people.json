@@ -1,18 +1,20 @@
 {
-  "sebastian": {
-    "name": "Sebastian",
-    "icon": "mdi:account",
-    "devices": {
-      "primary": ["AA:BB:CC:DD:EE:FF"],
-      "secondary": ["11:22:33:44:55:66", "77:88:99:AA:BB:CC"]
+  "version": 1,
+  "notes": ["Example people mapped to HA person entities and device ids"],
+  "people": [
+    {
+      "id": "sebastian",
+      "name": "Sebastian",
+      "ha_person": "person.sebastian",
+      "device_ids": ["iphone-sebastian", "macbook-sebastian"],
+      "notes": null
+    },
+    {
+      "id": "maria",
+      "name": "Maria",
+      "ha_person": "person.maria",
+      "device_ids": ["android-maria"],
+      "notes": null
     }
-  },
-  "maria": {
-    "name": "Maria",
-    "icon": "mdi:account-circle",
-    "devices": {
-      "primary": ["12:34:56:78:90:AB"],
-      "secondary": ["AB:CD:EF:12:34:56"]
-    }
-  }
+  ]
 }

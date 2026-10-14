@@ -6,7 +6,7 @@
 
 ## Current Implementation Status
 
-### ✅ Phase 2 Complete: Services & Event System (v0.2.0)
+### ✅ Phase 3 wired: entities + UniFi presence (v1.2.0)
 
 **What's Implemented:**
 
@@ -21,16 +21,14 @@
    - Prevents WiFi flapping spam
    - Events queued and fired after stable state
 
-3. **Template Helpers** (`template_helpers.py`)
-   - 5 Jinja2 template functions
-   - Registered in HA's global template function registry
-   - Available in templates, automations, scripts
-
-4. **Integration Structure**
-   - `__init__.py` - Entry point; setup stores entry in `hass.data` (platforms deferred)
+3. **Integration Structure**
+   - `__init__.py` - Entry point; creates coordinator, registers services, forwards platforms
    - `const.py` - Constants and defaults
    - `config_flow.py` - User / options / reauth flows with UniFi API validation
-   - `coordinator.py` - Data coordinator with stub methods
+   - `coordinator.py` - UniFi client poll + presence computation
+   - `device_tracker.py` / `sensor.py` - person/device trackers and unknown/guest sensors
+   - `api_parser.py`, `data_loader.py`, `device_matcher.py`, `presence.py` - parsing and matching
+   - JSON storage under HA config `unifi_people_pointer/` (`people.json`, `devices.json`)
    - `manifest.json` - Integration metadata
    - `strings.json` + translations - UI strings (EN/DE)
 
@@ -42,11 +40,11 @@
 - Options flow updates `scan_interval`; reauth step is `reauth_confirm`
 - No `NotImplementedError` on config/setup path (avoids HA HTTP 500 when adding the integration)
 
-**What's Stubbed:**
+**Still limited / later:**
 
-- Coordinator methods (no full UniFi client wiring yet)
-- Device tracker / sensor platforms not forwarded from setup yet
-- No JSON file storage (people.json, devices.json, etc.)
+- Mobile-app and ping fallbacks not fully wired
+- OUI database update and file watcher are incomplete
+- Optional Node/React backend remains separate from the HA integration path
 
 ## Architecture Decisions
 
@@ -67,9 +65,11 @@ Implementation: `EventDebouncer` class in `events.py`
 **Services never directly manipulate data**. All service calls:
 1. Validate input (voluptuous schemas)
 2. Delegate to coordinator methods
-3. Coordinator updates data
-4. Coordinator triggers refresh
-5. Entities update via coordinator
+3. Coordinator updates data under `_config_lock` (reload JSON, rebuild presence, sync tracker entities)
+4. Coordinator publishes updated data and requests a client refresh
+5. Entities update via coordinator (no full config-entry reload on assign/track/remove/claim)
+
+`assign_device` / `claim_unknown_device` are exclusive per MAC/device id across people.
 
 This ensures:
 - Single source of truth (coordinator)
@@ -77,24 +77,18 @@ This ensures:
 - Proper state propagation
 - Event firing in correct order
 
-### Template Helper Registration
-
-Template helpers are registered in `hass.data["template_functions"]` dict. This makes them globally available without needing to pass context.
-
-**Key Insight:** Template functions access coordinator via `hass.data[DOMAIN]["coordinator"]`, not via dependency injection. This allows templates to work anywhere.
 
 ## File Organization
 
 ```
 custom_components/unifi_people_pointer/
-├── __init__.py              # Integration setup, service/helper registration
+├── __init__.py              # Integration setup, service registration
 ├── const.py                 # All constants (events, services, defaults)
 ├── config_flow.py           # User/options/reauth config flow + API validation
-├── coordinator.py           # Data coordinator (stub methods for Phase 2)
+├── coordinator.py           # UniFi poll + presence computation
 ├── events.py                # Event system + debouncer
 ├── services.py              # Service handlers + schemas
 ├── services.yaml            # Service definitions (UI metadata)
-├── template_helpers.py      # Jinja2 functions
 ├── strings.json             # Base UI strings
 ├── manifest.json            # HA integration metadata
 └── translations/
@@ -140,21 +134,6 @@ event_manager.fire_person_arrived(
 )
 ```
 
-### Template Helper Pattern
-
-```python
-def template_function(param: str) -> ReturnType:
-    """Template helper docstring."""
-    coordinator = hass.data.get(DOMAIN, {}).get("coordinator")
-    if not coordinator:
-        return default_value
-    
-    try:
-        return coordinator.get_data(param)
-    except Exception as err:
-        _LOGGER.error("Error: %s", err)
-        return default_value
-```
 
 ## Testing Checklist
 
@@ -171,10 +150,6 @@ When testing this integration:
    - Verify debouncing (should NOT fire immediately)
    - Wait 3 minutes, verify event fires
 
-3. **Template Helpers**: Developer Tools → Template
-   - Test each helper function
-   - Verify they return expected types
-   - Test with invalid/missing data
 
 4. **Config Flow**: Settings → Integrations
    - Add integration via UI
@@ -183,18 +158,10 @@ When testing this integration:
 
 ## Next Implementation Phases
 
-### Phase 3: Core Data & Entities
-- UniFi API client integration
-- Person tracker entities
-- Device tracker entities
-- JSON file storage (people.json, devices.json)
-- AP zone mapping
-
-### Phase 4: Advanced Features
-- Unknown clients sensor
-- Guest clients sensor
-- OUI database integration
-- File watcher for JSON changes
+### Phase 4 leftovers
+- OUI database update path
+- File watcher for JSON changes (poll already reloads JSON)
+- AP zone mapping polish
 
 ### Phase 5: Web UI
 - React frontend
@@ -206,8 +173,6 @@ When testing this integration:
 ### Issue: Services not showing in UI
 **Solution:** Check `services.yaml` syntax, restart HA, clear browser cache
 
-### Issue: Template helpers not found
-**Solution:** Verify `setup_template_helpers()` is called in `__init__.py`, check `hass.data["template_functions"]`
 
 ### Issue: Events not firing
 **Solution:** Check debounce timeout (3min default), verify event_manager is initialized, check logs for event scheduling
@@ -224,7 +189,7 @@ When testing this integration:
 When making changes to this project:
 
 1. **Update version** in `manifest.json` when shipping features
-2. **Update README.md** with new examples when adding services/events/helpers
+2. **Update README.md** with new examples when adding services/events
 3. **Update AGENTS.md** when making architectural decisions
 4. **Update translations** (en.json, de.json) when changing UI strings
 5. **Update services.yaml** when modifying service schemas
@@ -235,7 +200,7 @@ Keep this file for durable project knowledge only. Prefer pointers to authoritat
 
 Full design document: `/home/ladwein/dtry-agent-workspace/data/unifi-people-pointer-scout-20260815/report.md`
 
-This implementation follows the scout report's Phase 2 specification for Services & Event System, with some consolidation from Phase 3 and Phase 4 service definitions.
+This implementation follows the scout report through Phase 3 entity/presence wiring; services/events from Phase 2 remain.
 
 ## Integration with Home Assistant
 
@@ -249,8 +214,7 @@ This implementation follows the scout report's Phase 2 specification for Service
 - Tested: 2024.1+
 
 ### Platform Support
-- Currently: None (no platforms enabled yet)
-- Planned: `device_tracker`, `sensor`
+- Currently: `device_tracker`, `sensor`
 
 ## Code Style & Conventions
 
@@ -263,6 +227,4 @@ This implementation follows the scout report's Phase 2 specification for Service
 
 ## Git Workflow
 
-Branch: `fm/unifi-pp-config-flow-500-20260816`
-
-This is a firstmate-managed autonomous worker branch. Changes will be submitted as a PR for review.
+Use a short-lived feature branch per change; open a PR against `main` for review.

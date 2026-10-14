@@ -27,7 +27,7 @@ Whitelist der zu trackenden Geräte.
 |---|---|
 | `id` | Stabiler Geräte-Schlüssel (Referenz aus `people.json`) |
 | `mac` | Bekannte WLAN-MAC |
-| `hostname_match` | Hostnamen aus UniFi zum Wiedererkennen |
+| `hostname_match` | Hostnamen aus UniFi (exact oder Substring, kein Regex) |
 | `manufacturer_id` | Verweis auf `manufacturers.json` oder `null` |
 | `type` | `smartphone` / `wearable` / … |
 | `track` | `true` = aktiv für Presence |
@@ -49,17 +49,19 @@ Zuordnung zu Home-Assistant-Person-Entities (Stand HA 2026.8, Location „Home�
 | Janine | `person.janine` | `iphone-jd`, `iphone-jd-alt` |
 | Tablet | `person.android` | `android-helgas`, `android-samsung` |
 
-Presence-Regel (vorgeschlagen): Person „zu Hause“, wenn **mindestens ein** referenziertes Gerät mit `track: true` in UniFi als online gilt (MAC- oder Hostname-Match).
+Presence-Regel: Person „zu Hause“, wenn **mindestens ein** referenziertes Gerät mit `track: true` in UniFi als online gilt (MAC- oder Hostname-Match; exact vor partial, mehrdeutige exact-Identitäten fail-closed).
 
 Watch-Zuordnung zu Sebastian ist geschätzt und sollte bei Bedarf korrigiert werden.
 
-## Empfohlener Match-Algorithmus
+## Match-Algorithmus
 
 1. Live-Client von der API holen.
-2. MAC exakt gegen `devices.json` prüfen.
-3. Sonst Hostname gegen `hostname_match` (Case-insensitive).
-4. Optional: OUI-Präfix ∈ `manufacturers.json` nur als Hinweis / Discovery, nicht als alleinige Presence-Quelle.
-5. Device-`id` → Person über `people.json` → HA-Entity aktualisieren.
+2. Pro Client: tracked devices mit exact-Match (MAC, dann `hostname_match`-Gleichheit, dann Anzeigename nur ohne eigene `hostname_match`-Tokens).
+3. Mehrere distinct exact-Hits am selben Client: fail-closed (kein exact-Hit).
+4. Nur wenn kein exact-Hit: partial über `hostname_match`-Substring (case-insensitive; kein Regex; Anzeigename zählt nicht).
+5. Optional: OUI-Präfix ∈ `manufacturers.json` nur als Hinweis / Discovery, nicht als Presence-Quelle.
+6. Device-`id` → Person über `people.json` (`device_ids` union primary/secondary MACs) → HA-Entity aktualisieren.
+7. Ownership ist exklusiv pro Gerät/MAC (assign/claim ziehen die Kennung bei anderen Personen ab).
 
 ## Umgebung
 

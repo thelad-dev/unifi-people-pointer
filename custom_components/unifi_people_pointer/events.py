@@ -103,6 +103,14 @@ class EventDebouncer:
         if event_key in self._pending_events:
             del self._pending_events[event_key]
 
+    @callback
+    def cancel_all(self) -> None:
+        """Cancel all pending debounced events."""
+        for event_key in list(self._timers):
+            self._timers[event_key]()
+            del self._timers[event_key]
+        self._pending_events.clear()
+
 
 class UniFiEventManager:
     """Manager for UniFi People Pointer events."""
@@ -115,6 +123,11 @@ class UniFiEventManager:
         self._debouncer = EventDebouncer(hass, debounce_seconds)
 
     @callback
+    def cancel_all(self) -> None:
+        """Cancel all pending events."""
+        self._debouncer.cancel_all()
+
+    @callback
     def fire_person_arrived(
         self,
         person: str,
@@ -124,7 +137,7 @@ class UniFiEventManager:
         signal_strength: int | None = None,
     ) -> None:
         """Fire person arrived event with debouncing."""
-        event_data = {
+        event_data: dict[str, Any] = {
             "person": person,
             "device": device,
             "timestamp": datetime.now().isoformat(),
@@ -137,6 +150,7 @@ class UniFiEventManager:
         if signal_strength is not None:
             event_data["signal_strength"] = signal_strength
 
+        self._debouncer.cancel_event(EVENT_PERSON_LEFT, person)
         self._debouncer.schedule_event(
             EVENT_PERSON_ARRIVED,
             person,
@@ -152,7 +166,7 @@ class UniFiEventManager:
         duration: int | None = None,
     ) -> None:
         """Fire person left event with debouncing."""
-        event_data = {
+        event_data: dict[str, Any] = {
             "person": person,
             "device": device,
             "timestamp": datetime.now().isoformat(),
@@ -163,6 +177,7 @@ class UniFiEventManager:
         if duration is not None:
             event_data["duration"] = duration
 
+        self._debouncer.cancel_event(EVENT_PERSON_ARRIVED, person)
         self._debouncer.schedule_event(
             EVENT_PERSON_LEFT,
             person,
@@ -180,7 +195,7 @@ class UniFiEventManager:
         signal_strength: int | None = None,
     ) -> None:
         """Fire device connected event with debouncing."""
-        event_data = {
+        event_data: dict[str, Any] = {
             "mac": mac,
             "timestamp": datetime.now().isoformat(),
         }
@@ -213,7 +228,7 @@ class UniFiEventManager:
         signal_strength: int | None = None,
     ) -> None:
         """Fire unknown device event with debouncing."""
-        event_data = {
+        event_data: dict[str, Any] = {
             "mac": mac,
             "timestamp": datetime.now().isoformat(),
         }

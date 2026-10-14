@@ -32,9 +32,17 @@ class TestConfigFlow:
 
     async def test_user_form_valid_input(self, hass: HomeAssistant):
         """Test successful configuration with valid input."""
-        with patch(
-            "custom_components.unifi_people_pointer.config_flow.validate_api_connection",
-            return_value={"sites": ["default"]},
+        # CREATE_ENTRY schedules real setup; mock it so unit tests do not open
+        # aiohttp sessions (leftover _run_safe_shutdown_loop fails teardown).
+        with (
+            patch(
+                "custom_components.unifi_people_pointer.config_flow.validate_api_connection",
+                return_value={"sites": ["default"]},
+            ),
+            patch(
+                "custom_components.unifi_people_pointer.async_setup_entry",
+                return_value=True,
+            ) as mock_setup_entry,
         ):
             result = await hass.config_entries.flow.async_init(
                 "unifi_people_pointer",
@@ -45,11 +53,13 @@ class TestConfigFlow:
                     "verify_ssl": False,
                 },
             )
+            await hass.async_block_till_done()
 
         assert result["type"] == data_entry_flow.FlowResultType.CREATE_ENTRY
         assert result["title"] == "UniFi People Pointer"
         assert result["data"][CONF_HOST] == "192.168.88.1"
         assert result["data"][CONF_TOKEN] == "valid_token_12345"
+        assert mock_setup_entry.call_count == 1
 
     async def test_user_form_invalid_host(self, hass: HomeAssistant):
         """Test configuration with invalid host."""
@@ -197,9 +207,16 @@ class TestConfigFlow:
         """Test successful reauthentication."""
         mock_config_entry.add_to_hass(hass)
 
-        with patch(
-            "custom_components.unifi_people_pointer.config_flow.validate_api_connection",
-            return_value={"sites": ["default"]},
+        # Reauth success reloads the entry; mock setup to avoid live sessions.
+        with (
+            patch(
+                "custom_components.unifi_people_pointer.config_flow.validate_api_connection",
+                return_value={"sites": ["default"]},
+            ),
+            patch(
+                "custom_components.unifi_people_pointer.async_setup_entry",
+                return_value=True,
+            ),
         ):
             result = await hass.config_entries.flow.async_init(
                 "unifi_people_pointer",
@@ -212,6 +229,7 @@ class TestConfigFlow:
             result = await hass.config_entries.flow.async_configure(
                 result["flow_id"], user_input={CONF_TOKEN: "new_valid_token"}
             )
+            await hass.async_block_till_done()
 
         assert result["type"] == data_entry_flow.FlowResultType.ABORT
         assert result["reason"] == "reauth_successful"
@@ -262,6 +280,7 @@ class TestValidateApiConnectionUrl:
             f"https://{expected_netloc}/proxy/network/integration/v1/sites"
         )
         assert result == {"sites": ["default"]}
+
 
 def test_default_verify_ssl_is_false():
     from custom_components.unifi_people_pointer.const import DEFAULT_VERIFY_SSL

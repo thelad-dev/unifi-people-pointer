@@ -156,7 +156,9 @@ async def validate_api_connection(
     return {"sites": sites or ["default"]}
 
 
-class UniFiPeoplePointerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class UniFiPeoplePointerConfigFlow(
+    config_entries.ConfigFlow, domain=DOMAIN
+):  # type: ignore[call-arg]
     """Handle a config flow for UniFi People Pointer."""
 
     VERSION = 1

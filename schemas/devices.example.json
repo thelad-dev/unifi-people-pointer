@@ -1,22 +1,26 @@
 {
+  "version": 1,
+  "notes": ["Example devices; hostname_match is exact or substring, not regex"],
   "devices": [
     {
-      "mac": "AA:BB:CC:DD:EE:FF",
-      "name": "Sebastian iPhone 14 Pro",
+      "id": "iphone-sebastian",
+      "name": "Sebastian iPhone",
       "type": "smartphone",
-      "manufacturer": "Apple Inc.",
-      "model": "iPhone 14 Pro",
-      "disabled": false,
-      "notes": "Primary device for Sebastian"
+      "manufacturer_id": "apple",
+      "mac": "aa:bb:cc:dd:ee:ff",
+      "hostname_match": ["iPhone-Sebastian"],
+      "track": true,
+      "notes": "Primary device"
     },
     {
-      "mac": "11:22:33:44:55:66",
+      "id": "macbook-sebastian",
       "name": "Sebastian MacBook",
       "type": "laptop",
-      "manufacturer": "Apple Inc.",
-      "model": "MacBook Pro",
-      "disabled": false,
-      "notes": "Secondary device for Sebastian"
+      "manufacturer_id": "apple",
+      "mac": "11:22:33:44:55:66",
+      "hostname_match": ["MacBook-Sebastian"],
+      "track": true,
+      "notes": "Secondary device"
     }
   ]
 }
