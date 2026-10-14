@@ -19,20 +19,23 @@ def _online_device_ids(
     devices: list[dict[str, Any]],
     clients: list[dict[str, Any]],
 ) -> set[str]:
-    """Return configured device ids that match an online client and are tracked."""
-    tracked = [
-        d
-        for d in devices
-        if isinstance(d, dict) and d.get("id") and is_tracked(d)
-    ]
+    """Return tracked device ids that match any online client.
+
+    Matching is device-centric so overlapping hostname patterns on multiple
+    tracked devices can all count as online for the same client.
+    """
     online: set[str] = set()
-    for client in clients:
-        device = match_device(client, tracked) or match_device_partial(client, tracked)
-        if device is None:
+    for device in devices:
+        if not isinstance(device, dict):
             continue
         device_id = device.get("id")
-        if device_id:
-            online.add(device_id)
+        if not device_id or not is_tracked(device):
+            continue
+        alone = [device]
+        for client in clients:
+            if match_device(client, alone) or match_device_partial(client, alone):
+                online.add(device_id)
+                break
     return online
 
 

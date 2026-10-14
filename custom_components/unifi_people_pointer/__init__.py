@@ -11,7 +11,6 @@ from .const import DEFAULT_EVENT_DEBOUNCE, DOMAIN
 from .coordinator import UniFiPeoplePointerCoordinator
 from .events import UniFiEventManager
 from .services import setup_services, unregister_services
-from .template_helpers import setup_template_helpers
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,13 +33,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "entry": entry,
         "coordinator": coordinator,
     }
-    # Services and template helpers resolve the active coordinator here.
+    # Services resolve the active coordinator here.
     hass.data[DOMAIN]["coordinator"] = coordinator
     hass.data[DOMAIN]["event_manager"] = event_manager
 
     if "services_registered" not in hass.data[DOMAIN]:
         setup_services(hass)
-        setup_template_helpers(hass)
         hass.data[DOMAIN]["services_registered"] = True
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

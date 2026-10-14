@@ -34,7 +34,7 @@ from .const import (
 )
 from .data_loader import DataLoader
 from .device_matcher import match_device, match_device_partial
-from .presence import determine_presence
+from .presence import _online_device_ids, determine_presence
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,6 +83,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._presence_by_person: dict[str, dict[str, Any]] = {}
         self._site_id: str | None = None
         self._site_key: str = "default"
+        self._prev_online_device_ids: set[str] = set()
+        self._prev_unknown_macs: set[str] = set()
+        self._events_primed: bool = False
         self.last_exception = ""
 
     @property
@@ -122,10 +125,23 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         presence_rows = determine_presence(self.people, self.devices, all_clients)
         previous = self._presence_by_person
         self._presence_by_person = {row["id"]: row for row in presence_rows}
+        now_online_ids = _online_device_ids(self.devices, all_clients)
 
-        # Fire debounced events when presence flips.
+        unknown = []
+        known_macs = {
+            normalize_mac(str(d.get("mac") or "")) for d in self.devices
+        }
+        for client in wireless:
+            matched = match_device(client, self.devices) or match_device_partial(
+                client, self.devices
+            )
+            if matched is None and client["mac"] not in known_macs:
+                unknown.append(client)
+        now_unknown_macs = {c["mac"] for c in unknown if c.get("mac")}
+
+        # Fire debounced events after the first baseline poll.
         event_manager = self.hass.data.get(DOMAIN, {}).get("event_manager")
-        if event_manager:
+        if event_manager and self._events_primed:
             for person_id, row in self._presence_by_person.items():
                 was = previous.get(person_id, {}).get("is_home")
                 now_home = row.get("is_home")
@@ -142,16 +158,48 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 else:
                     event_manager.fire_person_left(person=person_id, device=device)
 
-        unknown = []
-        known_macs = {
-            normalize_mac(str(d.get("mac") or "")) for d in self.devices
-        }
-        for client in wireless:
-            matched = match_device(client, self.devices) or match_device_partial(
-                client, self.devices
-            )
-            if matched is None and client["mac"] not in known_macs:
-                unknown.append(client)
+            devices_by_id = {
+                d["id"]: d for d in self.devices if isinstance(d, dict) and d.get("id")
+            }
+            for device_id in now_online_ids - self._prev_online_device_ids:
+                device = devices_by_id.get(device_id) or {}
+                mac = normalize_mac(str(device.get("mac") or ""))
+                person_id = None
+                for person in self.people:
+                    if device_id in (person.get("device_ids") or []):
+                        person_id = person.get("id")
+                        break
+                client = self._clients_by_mac.get(mac) if mac else None
+                signal = None
+                if client is not None:
+                    signal = client.get("signal")
+                    if signal is None:
+                        signal = client.get("signal_strength")
+                event_manager.fire_device_connected(
+                    mac=mac or str(device_id),
+                    person=person_id,
+                    device_type=device.get("type"),
+                    ap_name=(client or {}).get("ap_mac"),
+                    signal_strength=signal if isinstance(signal, int) else None,
+                )
+
+            unknown_by_mac = {c["mac"]: c for c in unknown if c.get("mac")}
+            for mac in now_unknown_macs - self._prev_unknown_macs:
+                client = unknown_by_mac.get(mac) or {}
+                signal = client.get("signal")
+                if signal is None:
+                    signal = client.get("signal_strength")
+                event_manager.fire_unknown_device(
+                    mac=mac,
+                    ip=client.get("ip"),
+                    hostname=client.get("hostname") or None,
+                    ap_name=client.get("ap_mac"),
+                    signal_strength=signal if isinstance(signal, int) else None,
+                )
+
+        self._prev_online_device_ids = now_online_ids
+        self._prev_unknown_macs = now_unknown_macs
+        self._events_primed = True
 
         guests = [c for c in wireless if c.get("is_guest")]
 
@@ -260,7 +308,6 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return True if MAC is present in the latest client list."""
         return normalize_mac(mac) in self._clients_by_mac
 
-    # Alias used by template helpers.
     is_device_connected = is_device_online
 
     def async_get_client_by_mac(self, mac: str) -> dict[str, Any] | None:

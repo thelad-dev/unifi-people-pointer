@@ -21,13 +21,8 @@
    - Prevents WiFi flapping spam
    - Events queued and fired after stable state
 
-3. **Template Helpers** (`template_helpers.py`)
-   - 5 Jinja2 template functions
-   - Registered in HA's global template function registry
-   - Available in templates, automations, scripts
-
-4. **Integration Structure**
-   - `__init__.py` - Entry point; creates coordinator, registers services/helpers, forwards platforms
+3. **Integration Structure**
+   - `__init__.py` - Entry point; creates coordinator, registers services, forwards platforms
    - `const.py` - Constants and defaults
    - `config_flow.py` - User / options / reauth flows with UniFi API validation
    - `coordinator.py` - UniFi client poll + presence computation
@@ -80,11 +75,6 @@ This ensures:
 - Proper state propagation
 - Event firing in correct order
 
-### Template Helper Registration
-
-Template helpers are registered in `hass.data["template_functions"]` dict. This makes them globally available without needing to pass context.
-
-**Key Insight:** Template functions access coordinator via `hass.data[DOMAIN]["coordinator"]`, not via dependency injection. This allows templates to work anywhere.
 
 ## File Organization
 
@@ -97,7 +87,6 @@ custom_components/unifi_people_pointer/
 ├── events.py                # Event system + debouncer
 ├── services.py              # Service handlers + schemas
 ├── services.yaml            # Service definitions (UI metadata)
-├── template_helpers.py      # Jinja2 functions
 ├── strings.json             # Base UI strings
 ├── manifest.json            # HA integration metadata
 └── translations/
@@ -143,21 +132,6 @@ event_manager.fire_person_arrived(
 )
 ```
 
-### Template Helper Pattern
-
-```python
-def template_function(param: str) -> ReturnType:
-    """Template helper docstring."""
-    coordinator = hass.data.get(DOMAIN, {}).get("coordinator")
-    if not coordinator:
-        return default_value
-    
-    try:
-        return coordinator.get_data(param)
-    except Exception as err:
-        _LOGGER.error("Error: %s", err)
-        return default_value
-```
 
 ## Testing Checklist
 
@@ -174,10 +148,6 @@ When testing this integration:
    - Verify debouncing (should NOT fire immediately)
    - Wait 3 minutes, verify event fires
 
-3. **Template Helpers**: Developer Tools → Template
-   - Test each helper function
-   - Verify they return expected types
-   - Test with invalid/missing data
 
 4. **Config Flow**: Settings → Integrations
    - Add integration via UI
@@ -209,8 +179,6 @@ When testing this integration:
 ### Issue: Services not showing in UI
 **Solution:** Check `services.yaml` syntax, restart HA, clear browser cache
 
-### Issue: Template helpers not found
-**Solution:** Verify `setup_template_helpers()` is called in `__init__.py`, check `hass.data["template_functions"]`
 
 ### Issue: Events not firing
 **Solution:** Check debounce timeout (3min default), verify event_manager is initialized, check logs for event scheduling
