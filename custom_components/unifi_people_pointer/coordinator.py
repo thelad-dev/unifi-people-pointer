@@ -155,11 +155,14 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 unknown.append(client)
         now_unknown_macs = {c["mac"] for c in unknown if c.get("mac")}
 
-        # Keep last live MAC per online device so leave events match arrive.
+        # First live MAC of a continuous online session (stable across private MAC rotation).
         for device_id in now_online_ids:
-            mac = self._mac_for_device_id(str(device_id))
+            key = str(device_id)
+            if key in self._device_event_macs:
+                continue
+            mac = self._mac_for_device_id(key)
             if mac:
-                self._device_event_macs[str(device_id)] = mac
+                self._device_event_macs[key] = mac
 
         # Fire debounced events after the first baseline poll.
         event_manager = self.hass.data.get(DOMAIN, {}).get("event_manager")
@@ -179,7 +182,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     device_mac = self._device_event_macs.get(
                         device_id
                     ) or self._mac_for_device_id(device_id)
-                    if device_mac:
+                    if device_mac and device_id not in self._device_event_macs:
                         self._device_event_macs[device_id] = device_mac
                 if now_home:
                     event_manager.fire_person_arrived(
@@ -193,14 +196,15 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for device_id in now_online_ids - self._prev_online_device_ids:
                 device = self._devices_by_id.get(device_id) or {}
                 client = self._live_client_for_device(device)
-                mac = ""
-                if client and client.get("mac"):
-                    mac = str(client["mac"])
-                else:
-                    mac = normalize_mac(str(device.get("mac") or ""))
+                mac = self._device_event_macs.get(str(device_id), "")
                 if not mac:
-                    mac = str(device_id)
-                self._device_event_macs[device_id] = mac
+                    if client and client.get("mac"):
+                        mac = str(client["mac"])
+                    else:
+                        mac = normalize_mac(str(device.get("mac") or ""))
+                    if not mac:
+                        mac = str(device_id)
+                    self._device_event_macs[str(device_id)] = mac
                 person_id = None
                 for person in self.people:
                     if device_id in (person.get("device_ids") or []):
@@ -220,10 +224,11 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
 
             for device_id in self._prev_online_device_ids - now_online_ids:
-                mac = self._device_event_macs.pop(device_id, None)
+                key = str(device_id)
+                mac = self._device_event_macs.pop(key, None)
                 if not mac:
                     device = self._devices_by_id.get(device_id) or {}
-                    mac = normalize_mac(str(device.get("mac") or "")) or str(device_id)
+                    mac = normalize_mac(str(device.get("mac") or "")) or key
                 event_manager.cancel_device_event(mac, EVENT_DEVICE_CONNECTED)
 
             unknown_by_mac = {c["mac"]: c for c in unknown if c.get("mac")}
