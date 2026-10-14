@@ -7,6 +7,23 @@ from typing import Any
 from .api_parser import extract_oui, normalize_mac
 
 
+def normalize_hostname_match(value: Any) -> list[str]:
+    """Normalize hostname_match to a list of non-empty string tokens."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        token = value.strip()
+        return [token] if token else []
+    if isinstance(value, (list, tuple)):
+        tokens: list[str] = []
+        for item in value:
+            token = str(item).strip()
+            if token:
+                tokens.append(token)
+        return tokens
+    return []
+
+
 def match_device(
     client: dict[str, Any], devices: list[dict[str, Any]]
 ) -> dict[str, Any] | None:
@@ -22,11 +39,8 @@ def match_device(
     if hostname:
         host_l = str(hostname).lower()
         for device in devices:
-            patterns = device.get("hostname_match") or []
-            for pattern in patterns:
-                token = str(pattern).strip().lower()
-                if not token:
-                    continue
+            for pattern in normalize_hostname_match(device.get("hostname_match")):
+                token = pattern.lower()
                 if token == host_l:
                     return device
     return None
@@ -45,11 +59,8 @@ def match_device_partial(
         return None
     host_l = str(hostname).lower()
     for device in devices:
-        patterns = device.get("hostname_match") or []
-        for pattern in patterns:
-            token = str(pattern).strip().lower()
-            if not token:
-                continue
+        for pattern in normalize_hostname_match(device.get("hostname_match")):
+            token = pattern.lower()
             if token in host_l:
                 return device
     return None

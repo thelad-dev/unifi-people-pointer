@@ -35,7 +35,11 @@ from .const import (
     STORAGE_DIR,
 )
 from .data_loader import DataLoader
-from .device_matcher import match_device, match_device_partial
+from .device_matcher import (
+    match_device,
+    match_device_partial,
+    normalize_hostname_match,
+)
 from .presence import _online_device_ids, determine_presence
 
 _LOGGER = logging.getLogger(__name__)
@@ -504,12 +508,10 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @staticmethod
     def _merge_hostname_match(
-        existing: list[Any] | None, seeds: list[str]
+        existing: Any, seeds: list[str]
     ) -> list[str]:
         """Merge seeds into hostname_match without wiping existing tokens."""
-        current = [
-            str(p).strip() for p in (existing or []) if str(p).strip()
-        ]
+        current = normalize_hostname_match(existing)
         if not seeds:
             return current
         if not current:
@@ -668,9 +670,15 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @staticmethod
     def _write_json(path: Path, data: dict[str, Any]) -> None:
         import json
+        import os
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        tmp_path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(tmp_path, path)
 
 
 # Backward-compatible alias used by older tests/docs.

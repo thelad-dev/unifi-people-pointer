@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .api_parser import normalize_mac
+from .device_matcher import normalize_hostname_match
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,6 +44,9 @@ def load_devices(path: Path) -> dict[str, Any]:
             continue
         if device.get("mac"):
             device["mac"] = normalize_mac(str(device["mac"]))
+        device["hostname_match"] = normalize_hostname_match(
+            device.get("hostname_match")
+        )
         if not validate_device(device):
             _LOGGER.warning(
                 "Ignoring invalid device entry in %s (need id + mac): %s",
@@ -171,19 +175,34 @@ class DataLoader:
 
     def reload(self) -> None:
         """Reload data files."""
-        if self._manufacturers_path and self._manufacturers_path.exists():
-            self._manufacturers = load_manufacturers(self._manufacturers_path)
-        else:
-            self._manufacturers = {"manufacturers": []}
+        try:
+            if self._manufacturers_path and self._manufacturers_path.exists():
+                self._manufacturers = load_manufacturers(self._manufacturers_path)
+            else:
+                self._manufacturers = {"manufacturers": []}
+        except (OSError, ValueError, json.JSONDecodeError) as err:
+            _LOGGER.warning(
+                "Keeping previous manufacturers data after reload failure: %s", err
+            )
 
-        if self._devices_path.exists():
-            self._devices = load_devices(self._devices_path)
-        else:
-            _LOGGER.warning("devices.json missing at %s", self._devices_path)
-            self._devices = {"version": 1, "devices": []}
+        try:
+            if self._devices_path.exists():
+                self._devices = load_devices(self._devices_path)
+            else:
+                _LOGGER.warning("devices.json missing at %s", self._devices_path)
+                self._devices = {"version": 1, "devices": []}
+        except (OSError, ValueError, json.JSONDecodeError) as err:
+            _LOGGER.warning(
+                "Keeping previous devices data after reload failure: %s", err
+            )
 
-        if self._people_path.exists():
-            self._people = load_people(self._people_path)
-        else:
-            _LOGGER.warning("people.json missing at %s", self._people_path)
-            self._people = {"version": 1, "people": []}
+        try:
+            if self._people_path.exists():
+                self._people = load_people(self._people_path)
+            else:
+                _LOGGER.warning("people.json missing at %s", self._people_path)
+                self._people = {"version": 1, "people": []}
+        except (OSError, ValueError, json.JSONDecodeError) as err:
+            _LOGGER.warning(
+                "Keeping previous people data after reload failure: %s", err
+            )
