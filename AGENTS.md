@@ -6,7 +6,7 @@
 
 ## Current Implementation Status
 
-### ✅ Phase 2 Complete: Services & Event System (v0.2.0)
+### ✅ Phase 3 wired: entities + UniFi presence (v1.2.0)
 
 **What's Implemented:**
 
@@ -27,10 +27,13 @@
    - Available in templates, automations, scripts
 
 4. **Integration Structure**
-   - `__init__.py` - Entry point; setup stores entry in `hass.data` (platforms deferred)
+   - `__init__.py` - Entry point; creates coordinator, registers services/helpers, forwards platforms
    - `const.py` - Constants and defaults
    - `config_flow.py` - User / options / reauth flows with UniFi API validation
-   - `coordinator.py` - Data coordinator with stub methods
+   - `coordinator.py` - UniFi client poll + presence computation
+   - `device_tracker.py` / `sensor.py` - person/device trackers and unknown/guest sensors
+   - `api_parser.py`, `data_loader.py`, `device_matcher.py`, `presence.py` - parsing and matching
+   - JSON storage under HA config `unifi_people_pointer/` (`people.json`, `devices.json`)
    - `manifest.json` - Integration metadata
    - `strings.json` + translations - UI strings (EN/DE)
 
@@ -42,11 +45,11 @@
 - Options flow updates `scan_interval`; reauth step is `reauth_confirm`
 - No `NotImplementedError` on config/setup path (avoids HA HTTP 500 when adding the integration)
 
-**What's Stubbed:**
+**Still limited / later:**
 
-- Coordinator methods (no full UniFi client wiring yet)
-- Device tracker / sensor platforms not forwarded from setup yet
-- No JSON file storage (people.json, devices.json, etc.)
+- Mobile-app and ping fallbacks not fully wired
+- OUI database update and file watcher are incomplete
+- Optional Node/React backend remains separate from the HA integration path
 
 ## Architecture Decisions
 
@@ -90,7 +93,7 @@ custom_components/unifi_people_pointer/
 ├── __init__.py              # Integration setup, service/helper registration
 ├── const.py                 # All constants (events, services, defaults)
 ├── config_flow.py           # User/options/reauth config flow + API validation
-├── coordinator.py           # Data coordinator (stub methods for Phase 2)
+├── coordinator.py           # UniFi poll + presence computation
 ├── events.py                # Event system + debouncer
 ├── services.py              # Service handlers + schemas
 ├── services.yaml            # Service definitions (UI metadata)
@@ -235,7 +238,7 @@ Keep this file for durable project knowledge only. Prefer pointers to authoritat
 
 Full design document: `/home/ladwein/dtry-agent-workspace/data/unifi-people-pointer-scout-20260815/report.md`
 
-This implementation follows the scout report's Phase 2 specification for Services & Event System, with some consolidation from Phase 3 and Phase 4 service definitions.
+This implementation follows the scout report through Phase 3 entity/presence wiring; services/events from Phase 2 remain.
 
 ## Integration with Home Assistant
 
@@ -249,8 +252,7 @@ This implementation follows the scout report's Phase 2 specification for Service
 - Tested: 2024.1+
 
 ### Platform Support
-- Currently: None (no platforms enabled yet)
-- Planned: `device_tracker`, `sensor`
+- Currently: `device_tracker`, `sensor`
 
 ## Code Style & Conventions
 

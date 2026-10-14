@@ -103,6 +103,14 @@ class EventDebouncer:
         if event_key in self._pending_events:
             del self._pending_events[event_key]
 
+    @callback
+    def cancel_all(self) -> None:
+        """Cancel all pending debounced events."""
+        for event_key in list(self._timers):
+            self._timers[event_key]()
+            del self._timers[event_key]
+        self._pending_events.clear()
+
 
 class UniFiEventManager:
     """Manager for UniFi People Pointer events."""
@@ -113,6 +121,11 @@ class UniFiEventManager:
         """Initialize event manager."""
         self.hass = hass
         self._debouncer = EventDebouncer(hass, debounce_seconds)
+
+    @callback
+    def cancel_all(self) -> None:
+        """Cancel all pending events."""
+        self._debouncer.cancel_all()
 
     @callback
     def fire_person_arrived(

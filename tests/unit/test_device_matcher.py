@@ -2,9 +2,6 @@
 
 import pytest
 
-# Device matcher helpers are still Phase 3 stubs (raise NotImplementedError).
-pytestmark = pytest.mark.skip(reason="Requires Phase 3 device_matcher implementation")
-
 
 @pytest.mark.unit
 class TestDeviceMatcher:

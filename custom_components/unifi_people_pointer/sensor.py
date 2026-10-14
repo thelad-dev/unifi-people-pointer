@@ -24,9 +24,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up UniFi People Pointer sensors from config entry."""
-    coordinator: UniFiPeoplePointerCoordinator = hass.data[DOMAIN][entry.entry_id]
+    runtime = hass.data[DOMAIN][entry.entry_id]
+    coordinator: UniFiPeoplePointerCoordinator = runtime["coordinator"]
 
-    # Create sensors
     entities = [
         UniFiUnknownClientsSensor(coordinator),
         UniFiGuestClientsSensor(coordinator),
@@ -36,23 +36,19 @@ async def async_setup_entry(
     _LOGGER.info("Added %d sensor entities", len(entities))
 
 
-class UniFiUnknownClientsSensor(CoordinatorEntity, SensorEntity):
+class UniFiUnknownClientsSensor(
+    CoordinatorEntity[UniFiPeoplePointerCoordinator], SensorEntity
+):
     """Sensor for unknown WiFi clients."""
+
+    _attr_name = "Unknown WiFi Clients"
+    _attr_unique_id = f"{DOMAIN}_unknown_clients"
 
     def __init__(self, coordinator: UniFiPeoplePointerCoordinator) -> None:
         """Initialize the unknown clients sensor."""
         super().__init__(coordinator)
         self._unknown_clients: list[dict[str, Any]] = []
-
-    @property
-    def unique_id(self) -> str:
-        """Return unique ID."""
-        return f"{DOMAIN}_unknown_clients"
-
-    @property
-    def name(self) -> str:
-        """Return the name."""
-        return "Unknown WiFi Clients"
+        self._first_seen: dict[str, str] = {}
 
     @property
     def native_value(self) -> int:
@@ -68,11 +64,10 @@ class UniFiUnknownClientsSensor(CoordinatorEntity, SensorEntity):
                     "mac": client.get("mac"),
                     "ip": client.get("ip"),
                     "hostname": client.get("hostname"),
-                    "manufacturer": client.get("manufacturer"),
                     "first_seen": client.get("first_seen"),
                     "last_seen": client.get("last_seen"),
-                    "signal_strength": client.get("signal_strength"),
-                    "ap_name": client.get("ap_name"),
+                    "signal_strength": client.get("signal")
+                    or client.get("signal_strength"),
                     "ap_mac": client.get("ap_mac"),
                 }
                 for client in self._unknown_clients
@@ -82,28 +77,34 @@ class UniFiUnknownClientsSensor(CoordinatorEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        # TODO: Implement unknown client detection
-        # For now, keep empty list
-
-        # Auto-dismiss old clients
+        now_iso = datetime.now().isoformat()
+        clients = list(self.coordinator.get_unknown_clients())
+        for client in clients:
+            mac = client.get("mac")
+            if not mac:
+                continue
+            if mac not in self._first_seen:
+                self._first_seen[mac] = now_iso
+            client["first_seen"] = self._first_seen[mac]
+        self._unknown_clients = clients
         self._auto_dismiss_old_clients()
-
         self.async_write_ha_state()
 
     def _auto_dismiss_old_clients(self) -> None:
         """Auto-dismiss unknown clients after configured days."""
         cutoff = datetime.now() - timedelta(days=AUTO_DISMISS_DAYS)
-
         original_count = len(self._unknown_clients)
-        self._unknown_clients = [
-            client
-            for client in self._unknown_clients
-            if datetime.fromisoformat(
-                client.get("first_seen", datetime.now().isoformat())
-            )
-            > cutoff
-        ]
-
+        kept = []
+        for client in self._unknown_clients:
+            first_seen = client.get("first_seen", datetime.now().isoformat())
+            try:
+                seen_dt = datetime.fromisoformat(str(first_seen))
+            except ValueError:
+                kept.append(client)
+                continue
+            if seen_dt > cutoff:
+                kept.append(client)
+        self._unknown_clients = kept
         dismissed_count = original_count - len(self._unknown_clients)
         if dismissed_count > 0:
             _LOGGER.info(
@@ -113,23 +114,18 @@ class UniFiUnknownClientsSensor(CoordinatorEntity, SensorEntity):
             )
 
 
-class UniFiGuestClientsSensor(CoordinatorEntity, SensorEntity):
+class UniFiGuestClientsSensor(
+    CoordinatorEntity[UniFiPeoplePointerCoordinator], SensorEntity
+):
     """Sensor for guest WiFi clients."""
+
+    _attr_name = "Guest WiFi Clients"
+    _attr_unique_id = f"{DOMAIN}_guest_clients"
 
     def __init__(self, coordinator: UniFiPeoplePointerCoordinator) -> None:
         """Initialize the guest clients sensor."""
         super().__init__(coordinator)
         self._guest_clients: list[dict[str, Any]] = []
-
-    @property
-    def unique_id(self) -> str:
-        """Return unique ID."""
-        return f"{DOMAIN}_guest_clients"
-
-    @property
-    def name(self) -> str:
-        """Return the name."""
-        return "Guest WiFi Clients"
 
     @property
     def native_value(self) -> int:
@@ -145,11 +141,10 @@ class UniFiGuestClientsSensor(CoordinatorEntity, SensorEntity):
                     "mac": client.get("mac"),
                     "ip": client.get("ip"),
                     "hostname": client.get("hostname"),
-                    "manufacturer": client.get("manufacturer"),
-                    "first_seen": client.get("first_seen"),
                     "last_seen": client.get("last_seen"),
-                    "signal_strength": client.get("signal_strength"),
-                    "ap_name": client.get("ap_name"),
+                    "signal_strength": client.get("signal")
+                    or client.get("signal_strength"),
+                    "ap_mac": client.get("ap_mac"),
                 }
                 for client in self._guest_clients
             ]
@@ -158,7 +153,5 @@ class UniFiGuestClientsSensor(CoordinatorEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        # TODO: Implement guest client detection from UniFi API
-        # For now, keep empty list
-
+        self._guest_clients = list(self.coordinator.get_guest_clients())
         self.async_write_ha_state()
