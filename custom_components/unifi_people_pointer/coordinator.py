@@ -82,6 +82,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._clients_by_mac: dict[str, dict[str, Any]] = {}
         self._presence_by_person: dict[str, dict[str, Any]] = {}
         self._site_id: str | None = None
+        self._site_key: str = "default"
         self.last_exception = ""
 
     @property
@@ -175,13 +176,18 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         timeout = aiohttp.ClientTimeout(total=20)
 
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            site_id = self._site_id or await self._resolve_site_id(
-                session, base, headers, ssl_param
-            )
-            self._site_id = site_id
+            if not self._site_id:
+                site_id, site_key = await self._resolve_site(
+                    session, base, headers, ssl_param
+                )
+                self._site_id = site_id
+                self._site_key = site_key
+            site_id = self._site_id
 
             # Prefer classic live station list (richer fields).
-            classic_url = f"{base}/proxy/network/api/s/default/stat/sta"
+            classic_url = (
+                f"{base}/proxy/network/api/s/{self._site_key}/stat/sta"
+            )
             try:
                 async with session.get(
                     classic_url, headers=headers, ssl=ssl_param
@@ -193,8 +199,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         if isinstance(payload, dict) and isinstance(
                             payload.get("data"), list
                         ):
-                            return payload["data"]
-                        if isinstance(payload, list):
+                            if payload["data"]:
+                                return payload["data"]
+                            _LOGGER.debug(
+                                "Classic sta returned empty data; trying integration API"
+                            )
+                        elif isinstance(payload, list) and payload:
                             return payload
             except (PermissionError, asyncio.TimeoutError):
                 raise
@@ -222,14 +232,14 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     return payload
                 return []
 
-    async def _resolve_site_id(
+    async def _resolve_site(
         self,
         session: aiohttp.ClientSession,
         base: str,
         headers: dict[str, str],
         ssl_param: bool | object,
-    ) -> str:
-        """Resolve UniFi site UUID for Integration API paths."""
+    ) -> tuple[str, str]:
+        """Resolve UniFi site UUID and classic site key."""
         url = f"{base}/proxy/network/integration/v1/sites"
         async with session.get(url, headers=headers, ssl=ssl_param) as response:
             if response.status in (401, 403):
@@ -240,7 +250,13 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if isinstance(payload, dict):
             for site in payload.get("data") or []:
                 if isinstance(site, dict) and site.get("id"):
-                    return str(site["id"])
+                    site_id = str(site["id"])
+                    site_key = (
+                        site.get("internalReference")
+                        or site.get("name")
+                        or "default"
+                    )
+                    return site_id, str(site_key)
         raise ConnectionError("No UniFi site id found")
 
     def is_device_online(self, mac: str) -> bool:
@@ -253,6 +269,21 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def async_get_client_by_mac(self, mac: str) -> dict[str, Any] | None:
         """Return normalized client dict for MAC if online."""
         return self._clients_by_mac.get(normalize_mac(mac))
+
+    def get_device_signal(self, mac: str) -> int | None:
+        """Return signal strength in dBm for an online device MAC."""
+        client = self.async_get_client_by_mac(mac)
+        if not client:
+            return None
+        signal = client.get("signal")
+        if signal is None:
+            signal = client.get("signal_strength")
+        if signal is None:
+            return None
+        try:
+            return int(signal)
+        except (TypeError, ValueError):
+            return None
 
     def get_person_state(self, person_id: str) -> str:
         """Return home/away for a person id."""
@@ -279,22 +310,24 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         return str(client.get("ap_mac"))
         return None
 
-    def get_person_devices(self, person_id: str) -> list[dict[str, Any]]:
-        """Return device info for a person."""
+    def get_person_devices(self, person_id: str) -> dict[str, Any]:
+        """Return primary/secondary device info for a person."""
         row = self._presence_by_person.get(person_id) or {}
         online = set(row.get("online_device_ids") or [])
-        result = []
+        enriched: list[dict[str, Any]] = []
         for device in row.get("devices") or []:
             mac = normalize_mac(str(device.get("mac") or ""))
             client = self._clients_by_mac.get(mac)
-            result.append(
+            enriched.append(
                 {
                     **device,
                     "connected": device.get("id") in online or bool(client),
                     "client": client,
                 }
             )
-        return result
+        primary = enriched[0] if enriched else None
+        secondary = enriched[1:] if len(enriched) > 1 else []
+        return {"primary": primary, "secondary": secondary}
 
     def get_unknown_clients(self) -> list[dict[str, Any]]:
         """Unknown wireless clients from last update."""

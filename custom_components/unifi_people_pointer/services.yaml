@@ -2,7 +2,7 @@
 
 assign_device:
   name: Assign Device to Person
-  description: Assign a device (by MAC address) to a person as primary or secondary device
+  description: Assign a device (by MAC address) to a person as primary or secondary device. Reloads the integration so tracker entities and primary/secondary attributes refresh immediately.
   fields:
     mac:
       name: MAC Address
@@ -38,7 +38,7 @@ assign_device:
 
 track_device:
   name: Track Device
-  description: Start tracking a device (adds it to devices.json and enables tracking)
+  description: Start tracking a device (adds it to devices.json and enables tracking). Reloads the integration so device tracker entities refresh immediately.
   fields:
     mac:
       name: MAC Address
@@ -108,7 +108,7 @@ force_update_person:
 
 claim_unknown_device:
   name: Claim Unknown Device
-  description: Claim an unknown device and assign it to a person
+  description: Claim an unknown device and assign it to a person. Reloads the integration so tracker entities and primary/secondary attributes refresh immediately.
   fields:
     mac:
       name: MAC Address

@@ -104,6 +104,10 @@ class UniFiUnknownClientsSensor(
                 continue
             if seen_dt > cutoff:
                 kept.append(client)
+                continue
+            mac = client.get("mac")
+            if mac:
+                self._first_seen.pop(mac, None)
         self._unknown_clients = kept
         dismissed_count = original_count - len(self._unknown_clients)
         if dismissed_count > 0:

@@ -92,11 +92,11 @@ Die Integration speichert Konfiguration in JSON-Dateien unter `/config/unifi_peo
 
 Die Integration bietet folgende Services:
 
-- `unifi_people_pointer.assign_device` - Gerät einer Person zuweisen
-- `unifi_people_pointer.track_device` - Neues Gerät tracken
+- `unifi_people_pointer.assign_device` - Gerät einer Person zuweisen (lädt die Integration neu, damit Tracker/Attribute sofort stimmen)
+- `unifi_people_pointer.track_device` - Neues Gerät tracken (lädt die Integration neu)
 - `unifi_people_pointer.remove_device` - Gerät entfernen
 - `unifi_people_pointer.scan_now` - Sofortiges Netzwerk-Scan
-- `unifi_people_pointer.claim_unknown_device` - Unbekanntes Gerät beanspruchen
+- `unifi_people_pointer.claim_unknown_device` - Unbekanntes Gerät beanspruchen (lädt die Integration neu)
 
 #### 📊 Events
 
@@ -226,11 +226,11 @@ The integration stores configuration in JSON files under `/config/unifi_people_p
 
 The integration provides these services:
 
-- `unifi_people_pointer.assign_device` - Assign device to person
-- `unifi_people_pointer.track_device` - Track new device
+- `unifi_people_pointer.assign_device` - Assign device to person (reloads the integration so trackers/attributes refresh immediately)
+- `unifi_people_pointer.track_device` - Track new device (reloads the integration)
 - `unifi_people_pointer.remove_device` - Remove device
 - `unifi_people_pointer.scan_now` - Immediate network scan
-- `unifi_people_pointer.claim_unknown_device` - Claim unknown device
+- `unifi_people_pointer.claim_unknown_device` - Claim unknown device (reloads the integration)
 
 #### 📊 Events
 

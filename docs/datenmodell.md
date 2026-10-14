@@ -27,7 +27,7 @@ Whitelist der zu trackenden Geräte.
 |---|---|
 | `id` | Stabiler Geräte-Schlüssel (Referenz aus `people.json`) |
 | `mac` | Bekannte WLAN-MAC |
-| `hostname_match` | Hostnamen aus UniFi zum Wiedererkennen |
+| `hostname_match` | Hostnamen aus UniFi (exact oder Substring, kein Regex) |
 | `manufacturer_id` | Verweis auf `manufacturers.json` oder `null` |
 | `type` | `smartphone` / `wearable` / … |
 | `track` | `true` = aktiv für Presence |
@@ -57,7 +57,7 @@ Watch-Zuordnung zu Sebastian ist geschätzt und sollte bei Bedarf korrigiert wer
 
 1. Live-Client von der API holen.
 2. MAC exakt gegen `devices.json` prüfen.
-3. Sonst Hostname gegen `hostname_match` (Case-insensitive).
+3. Sonst Hostname gegen `hostname_match` (exact, dann Substring; case-insensitive; kein Regex).
 4. Optional: OUI-Präfix ∈ `manufacturers.json` nur als Hinweis / Discovery, nicht als alleinige Presence-Quelle.
 5. Device-`id` → Person über `people.json` → HA-Entity aktualisieren.
 

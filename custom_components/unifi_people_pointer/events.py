@@ -150,6 +150,7 @@ class UniFiEventManager:
         if signal_strength is not None:
             event_data["signal_strength"] = signal_strength
 
+        self._debouncer.cancel_event(EVENT_PERSON_LEFT, person)
         self._debouncer.schedule_event(
             EVENT_PERSON_ARRIVED,
             person,
@@ -176,6 +177,7 @@ class UniFiEventManager:
         if duration is not None:
             event_data["duration"] = duration
 
+        self._debouncer.cancel_event(EVENT_PERSON_ARRIVED, person)
         self._debouncer.schedule_event(
             EVENT_PERSON_LEFT,
             person,

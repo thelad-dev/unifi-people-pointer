@@ -31,7 +31,7 @@
       "type": "smartphone",
       "manufacturer_id": "samsung",
       "mac": "50:32:75:15:c9:68",
-      "hostname_match": ["android-.*sarah.*"],
+      "hostname_match": ["sarah"],
       "track": true
     }
   ]
@@ -127,11 +127,11 @@
     
     {"id": "phone-sarah", "name": "Samsung-Sarah", "type": "smartphone",
      "manufacturer_id": "samsung", "mac": "50:32:75:15:c9:68",
-     "hostname_match": ["android-.*sarah.*"], "track": true},
+     "hostname_match": ["sarah"], "track": true},
     
     {"id": "phone-lisa", "name": "Pixel-Lisa", "type": "smartphone",
      "manufacturer_id": "google", "mac": "d4:f5:47:8a:b2:c1",
-     "hostname_match": ["Pixel.*Lisa"], "track": true},
+     "hostname_match": ["Pixel-Lisa"], "track": true},
     
     {"id": "tablet-shared", "name": "Tablet-Wohnzimmer", "type": "tablet",
      "manufacturer_id": "samsung", "mac": "ac:5a:fc:12:34:56",
@@ -510,7 +510,7 @@ automation:
       "type": "smartphone",
       "manufacturer_id": "samsung",
       "mac": "50:32:75:15:c9:68",
-      "hostname_match": ["android-.*sarah.*"],
+      "hostname_match": ["sarah"],
       "track": true
     }
   ]

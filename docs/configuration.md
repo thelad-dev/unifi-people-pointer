@@ -110,20 +110,20 @@ Definiert alle zu trackenden WLAN-Geräte.
 - `type`: Gerätetyp (für Filterung/Gruppierung)
 - `manufacturer_id`: Referenz auf `manufacturers.json` (oder `null`)
 - `mac`: Aktuelle MAC-Adresse
-- `hostname_match`: Array von Hostname-Patterns (wichtig für private MACs!)
+- `hostname_match`: Array von Hostnamen (exact match) oder Substrings (partial match); kein Regex
 - `track`: `true` = aktiv tracken, `false` = ignorieren
 - `notes`: Optionale Dokumentation
 
 **Private MAC-Adressen:**
 
-iPhones und moderne Android-Geräte randomisieren ihre MAC-Adresse. Die Integration erkennt sie trotzdem via `hostname_match`:
+iPhones und moderne Android-Geräte randomisieren ihre MAC-Adresse. Die Integration erkennt sie trotzdem via `hostname_match` (exakter Hostname oder Substring, case-insensitive; kein Regex). Bei zu groben Substrings (z. B. nur `iPhone`) lieber den exakten Hostnamen verwenden:
 
 ```json
 {
   "id": "iphone-jd",
   "mac": "1c:3c:78:b8:ae:b5",
-  "hostname_match": ["iPhone-JD", "iPhone-JD.*"],
-  "notes": "MAC wechselt, Hostname bleibt stabil"
+  "hostname_match": ["iPhone-JD"],
+  "notes": "MAC wechselt, Hostname bleibt stabil; exact match bevorzugen"
 }
 ```
 
@@ -422,20 +422,20 @@ Defines all WiFi devices to track.
 - `type`: Device type (for filtering/grouping)
 - `manufacturer_id`: Reference to `manufacturers.json` (or `null`)
 - `mac`: Current MAC address
-- `hostname_match`: Array of hostname patterns (important for private MACs!)
+- `hostname_match`: Array of hostnames (exact match) or substrings (partial match); not regex
 - `track`: `true` = actively track, `false` = ignore
 - `notes`: Optional documentation
 
 **Private MAC Addresses:**
 
-iPhones and modern Android devices randomize their MAC address. The integration still recognizes them via `hostname_match`:
+iPhones and modern Android devices randomize their MAC address. The integration still recognizes them via `hostname_match` (exact hostname or substring, case-insensitive; not regex). Prefer exact hostnames when a short substring would be too coarse (e.g. just `iPhone`):
 
 ```json
 {
   "id": "iphone-jd",
   "mac": "1c:3c:78:b8:ae:b5",
-  "hostname_match": ["iPhone-JD", "iPhone-JD.*"],
-  "notes": "MAC changes, hostname stays stable"
+  "hostname_match": ["iPhone-JD"],
+  "notes": "MAC changes, hostname stays stable; prefer exact match"
 }
 ```
 
