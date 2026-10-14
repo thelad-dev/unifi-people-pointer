@@ -337,11 +337,13 @@ class UniFiDeviceTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
 
     def _is_connected(self) -> bool:
         """Check if device is connected using the current configured MAC."""
-        mac = self._current_mac()
+        device = self._current_device()
+        if device is None:
+            return False
+        mac = normalize_mac(str(device.get("mac") or "")) or self._current_mac()
         if mac and self.coordinator.is_device_online(mac):
             return True
-        device = self._current_device()
-        device_id = (device or {}).get("id") or self._device_id
+        device_id = device.get("id")
         if device_id and device_id in getattr(
             self.coordinator, "_online_device_ids_cache", set()
         ):

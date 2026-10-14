@@ -393,13 +393,13 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return normalize_mac(str(device.get("mac") or ""))
 
     def is_device_online(self, mac: str) -> bool:
-        """Return True if configured MAC is online via MAC or hostname match."""
+        """Return True if a still-configured device MAC is online."""
         mac_n = normalize_mac(mac)
-        if mac_n in self._clients_by_mac:
-            return True
         device = self._device_by_configured_mac.get(mac_n)
         if not device:
             return False
+        if mac_n in self._clients_by_mac:
+            return True
         device_id = device.get("id")
         return bool(device_id and device_id in self._online_device_ids_cache)
 
