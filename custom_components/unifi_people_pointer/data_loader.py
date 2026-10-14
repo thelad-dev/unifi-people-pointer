@@ -177,35 +177,42 @@ class DataLoader:
         return self._manufacturers
 
     def reload(self) -> None:
-        """Reload data files."""
+        """Reload data files and swap people/devices together."""
+        manufacturers = self._manufacturers
         try:
             if self._manufacturers_path and self._manufacturers_path.exists():
-                self._manufacturers = load_manufacturers(self._manufacturers_path)
+                manufacturers = load_manufacturers(self._manufacturers_path)
             else:
-                self._manufacturers = {"manufacturers": []}
+                manufacturers = {"manufacturers": []}
         except (OSError, ValueError, json.JSONDecodeError) as err:
             _LOGGER.warning(
                 "Keeping previous manufacturers data after reload failure: %s", err
             )
 
+        devices = self._devices
         try:
             if self._devices_path.exists():
-                self._devices = load_devices(self._devices_path)
+                devices = load_devices(self._devices_path)
             else:
                 _LOGGER.warning("devices.json missing at %s", self._devices_path)
-                self._devices = {"version": 1, "devices": []}
+                devices = {"version": 1, "devices": []}
         except (OSError, ValueError, json.JSONDecodeError) as err:
             _LOGGER.warning(
                 "Keeping previous devices data after reload failure: %s", err
             )
 
+        people = self._people
         try:
             if self._people_path.exists():
-                self._people = load_people(self._people_path)
+                people = load_people(self._people_path)
             else:
                 _LOGGER.warning("people.json missing at %s", self._people_path)
-                self._people = {"version": 1, "people": []}
+                people = {"version": 1, "people": []}
         except (OSError, ValueError, json.JSONDecodeError) as err:
             _LOGGER.warning(
                 "Keeping previous people data after reload failure: %s", err
             )
+
+        self._manufacturers = manufacturers
+        self._devices = devices
+        self._people = people

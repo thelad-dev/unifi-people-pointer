@@ -27,6 +27,8 @@ from .const import (
     DEVICES_FILE,
     DOMAIN,
     EVENT_DEVICE_CONNECTED,
+    EVENT_PERSON_ARRIVED,
+    EVENT_PERSON_LEFT,
     EVENT_UNKNOWN_DEVICE,
     MANUFACTURERS_FILE,
     PEOPLE_FILE,
@@ -34,7 +36,7 @@ from .const import (
     STATE_HOME,
     STORAGE_DIR,
 )
-from .data_loader import DataLoader
+from .data_loader import DataLoader, load_devices, load_people
 from .device_matcher import (
     match_device,
     match_device_partial,
@@ -163,6 +165,25 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # After the first baseline, always process transitions/cancels whenever
         # the baseline advances (including config-only rebuilds).
         if event_manager and self._events_primed:
+            for person_id in list(previous.keys()):
+                if person_id in self._presence_by_person:
+                    continue
+                prev_row = previous.get(person_id) or {}
+                event_manager.cancel_person_event(person_id, EVENT_PERSON_ARRIVED)
+                event_manager.cancel_person_event(person_id, EVENT_PERSON_LEFT)
+                if not prev_row.get("is_home"):
+                    continue
+                device_mac = ""
+                source_ids = prev_row.get("online_device_ids") or []
+                if source_ids:
+                    device_id = str(source_ids[0])
+                    device_mac = self._device_event_macs.get(
+                        device_id
+                    ) or self._mac_for_device_id(device_id)
+                event_manager.fire_person_left(
+                    person=person_id, device=device_mac
+                )
+
             for person_id, row in self._presence_by_person.items():
                 was = previous.get(person_id, {}).get("is_home")
                 now_home = row.get("is_home")
@@ -265,10 +286,6 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch clients from UniFi and compute presence."""
-        # Pick up people/devices.json edits without a full reload.
-        async with self._config_lock:
-            await self.hass.async_add_executor_job(self._loader.reload)
-
         fetch_error: Exception | None = None
         try:
             raw_clients = await self._fetch_clients()
@@ -277,22 +294,20 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.last_exception = str(err)
             raw_clients = None
 
-        if raw_clients is not None:
-            all_clients = deduplicate_clients(parse_clients(raw_clients))
-            data = self._rebuild_presence_state(all_clients)
-            await self.async_sync_tracker_entities()
-            return data
+        async with self._config_lock:
+            await self.hass.async_add_executor_job(self._loader.reload)
+            if raw_clients is not None:
+                all_clients = deduplicate_clients(parse_clients(raw_clients))
+                data = self._rebuild_presence_state(all_clients)
+            elif self._all_clients or self._clients_by_mac or self._presence_by_person:
+                data = self._rebuild_presence_state(list(self._all_clients))
+            else:
+                raise UpdateFailed(
+                    f"UniFi client fetch failed: {fetch_error}"
+                ) from fetch_error
 
-        # Config already reloaded; recompute from last-good clients so ownership
-        # changes apply even when UniFi is temporarily unreachable.
-        if self._all_clients or self._clients_by_mac or self._presence_by_person:
-            data = self._rebuild_presence_state(list(self._all_clients))
-            await self.async_sync_tracker_entities()
-            return data
-
-        raise UpdateFailed(
-            f"UniFi client fetch failed: {fetch_error}"
-        ) from fetch_error
+        await self.async_sync_tracker_entities()
+        return data
 
     async def _fetch_clients(self) -> list[dict[str, Any]]:
         """Fetch clients from UniFi API."""
@@ -506,6 +521,21 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return []
         return list(self.data.get("guest_clients") or [])
 
+
+    def _read_devices_file(self) -> dict[str, Any]:
+        """Read devices.json from disk without touching the shared loader."""
+        path = self.storage_path / DEVICES_FILE
+        if path.exists():
+            return load_devices(path)
+        return {"version": 1, "devices": []}
+
+    def _read_people_file(self) -> dict[str, Any]:
+        """Read people.json from disk without touching the shared loader."""
+        path = self.storage_path / PEOPLE_FILE
+        if path.exists():
+            return load_people(path)
+        return {"version": 1, "people": []}
+
     async def assign_device(
         self,
         mac: str,
@@ -518,6 +548,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.hass.async_add_executor_job(
                 self._assign_device_sync, mac, person, device_type, device_name
             )
+            self._loader.reload()
             self._rebuild_presence_state(list(self._all_clients))
         await self.async_request_refresh()
         await self.async_sync_tracker_entities()
@@ -560,9 +591,8 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         device_type: str,
         device_name: str | None,
     ) -> None:
-        self._loader.reload()
         mac_n = normalize_mac(mac)
-        devices_data = self._loader.get_devices()
+        devices_data = self._read_devices_file()
         devices = list(devices_data.get("devices") or [])
         existing = next(
             (d for d in devices if normalize_mac(str(d.get("mac") or "")) == mac_n),
@@ -592,7 +622,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         devices_data["devices"] = devices
         self._write_json(self.storage_path / DEVICES_FILE, devices_data)
 
-        people_data = self._loader.get_people()
+        people_data = self._read_people_file()
         people = list(people_data.get("people") or [])
         target = next((p for p in people if p.get("id") == person), None)
         if target is None:
@@ -639,7 +669,6 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         target["primary_device"] = None
         target["secondary_devices"] = []
         self._write_json(self.storage_path / PEOPLE_FILE, people_data)
-        self._loader.reload()
 
     async def track_device(
         self, mac: str, name: str, device_type: str = "other"
@@ -649,14 +678,14 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.hass.async_add_executor_job(
                 self._track_device_sync, mac, name, device_type
             )
+            self._loader.reload()
             self._rebuild_presence_state(list(self._all_clients))
         await self.async_request_refresh()
         await self.async_sync_tracker_entities()
 
     def _track_device_sync(self, mac: str, name: str, device_type: str) -> None:
-        self._loader.reload()
         mac_n = normalize_mac(mac)
-        devices_data = self._loader.get_devices()
+        devices_data = self._read_devices_file()
         devices = list(devices_data.get("devices") or [])
         seeds = self._hostname_match_seeds(mac_n, name)
         for device in devices:
@@ -668,7 +697,6 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     device.get("hostname_match"), seeds
                 )
                 self._write_json(self.storage_path / DEVICES_FILE, devices_data)
-                self._loader.reload()
                 return
         devices.append(
             {
@@ -682,12 +710,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         devices_data["devices"] = devices
         self._write_json(self.storage_path / DEVICES_FILE, devices_data)
-        self._loader.reload()
 
     async def remove_device(self, mac: str) -> None:
         """Stop tracking / remove a device."""
         async with self._config_lock:
             await self.hass.async_add_executor_job(self._remove_device_sync, mac)
+            self._loader.reload()
             self._rebuild_presence_state(list(self._all_clients))
         await self.async_request_refresh()
         await self.async_sync_tracker_entities()
@@ -715,9 +743,8 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             person["secondary_devices"] = kept_secondaries
 
     def _remove_device_sync(self, mac: str) -> None:
-        self._loader.reload()
         mac_n = normalize_mac(mac)
-        devices_data = self._loader.get_devices()
+        devices_data = self._read_devices_file()
         devices = list(devices_data.get("devices") or [])
         removed_ids = []
         kept = []
@@ -729,13 +756,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         devices_data["devices"] = kept
         self._write_json(self.storage_path / DEVICES_FILE, devices_data)
 
-        people_data = self._loader.get_people()
+        people_data = self._read_people_file()
         for person in people_data.get("people") or []:
             ids = [i for i in (person.get("device_ids") or []) if i not in removed_ids]
             person["device_ids"] = ids
             self._detach_mac_from_person(person, mac_n)
         self._write_json(self.storage_path / PEOPLE_FILE, people_data)
-        self._loader.reload()
 
     async def force_update_person(self, person: str) -> None:
         """Force a refresh (person filter currently ignored)."""
