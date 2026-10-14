@@ -65,19 +65,23 @@ async def async_setup_entry(
         entities.append(UniFiPersonTracker(coordinator, person_data))
 
     for device in coordinator.devices:
-        if not device.get("mac"):
+        device_id = device.get("id")
+        mac = normalize_mac(str(device.get("mac") or ""))
+        if not device_id and not mac:
             continue
         person_id = None
-        for person in coordinator.people:
-            if device.get("id") in (person.get("device_ids") or []):
-                person_id = person.get("id")
-                break
+        if device_id:
+            for person in coordinator.people:
+                if device_id in (person.get("device_ids") or []):
+                    person_id = person.get("id")
+                    break
         entities.append(
             UniFiDeviceTracker(
                 coordinator,
                 {
-                    "mac": normalize_mac(str(device["mac"])),
-                    "name": device.get("name") or device.get("id") or device["mac"],
+                    "id": device_id,
+                    "mac": mac,
+                    "name": device.get("name") or device_id or mac,
                     "type": device.get("type"),
                     "person": person_id,
                 },
@@ -227,11 +231,47 @@ class UniFiDeviceTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
     ) -> None:
         """Initialize the device tracker."""
         super().__init__(coordinator)
-        self._mac = normalize_mac(str(device_data["mac"]))
+        self._device_id = device_data.get("id")
+        self._setup_mac = normalize_mac(str(device_data.get("mac") or ""))
         self._attr_name = device_data["name"]
-        self._person: str | None = device_data.get("person")
-        self._device_type: str | None = device_data.get("type")
-        self._attr_unique_id = f"{DOMAIN}_device_{self._mac.replace(':', '').lower()}"
+        uid_key = (
+            str(self._device_id)
+            if self._device_id
+            else self._setup_mac.replace(":", "").lower()
+        )
+        self._attr_unique_id = f"{DOMAIN}_device_{uid_key}"
+
+    def _current_device(self) -> dict[str, Any] | None:
+        """Return the live devices.json record for this tracker."""
+        if self._device_id:
+            for device in self.coordinator.devices:
+                if isinstance(device, dict) and device.get("id") == self._device_id:
+                    return device
+        if self._setup_mac:
+            for device in self.coordinator.devices:
+                if not isinstance(device, dict):
+                    continue
+                if normalize_mac(str(device.get("mac") or "")) == self._setup_mac:
+                    return device
+        return None
+
+    def _current_mac(self) -> str:
+        """Configured MAC from the latest devices.json entry."""
+        device = self._current_device()
+        if device and device.get("mac"):
+            return normalize_mac(str(device["mac"]))
+        return self._setup_mac
+
+    def _current_person(self) -> str | None:
+        """Person id currently assigned to this device."""
+        device = self._current_device()
+        device_id = (device or {}).get("id") or self._device_id
+        if not device_id:
+            return None
+        for person in self.coordinator.people:
+            if device_id in (person.get("device_ids") or []):
+                return person.get("id")
+        return None
 
     @property
     def source_type(self) -> SourceType:
@@ -261,7 +301,9 @@ class UniFiDeviceTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return state attributes."""
-        client = self.coordinator.async_get_client_by_mac(self._mac) or {}
+        mac = self._current_mac()
+        device = self._current_device() or {}
+        client = self.coordinator.async_get_client_by_mac(mac) or {}
         last_seen = client.get("last_seen")
         last_seen_iso = None
         if isinstance(last_seen, (int, float)):
@@ -272,20 +314,30 @@ class UniFiDeviceTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
         elif last_seen is not None:
             last_seen_iso = str(last_seen)
         return {
-            "mac": self._mac,
+            "mac": mac,
+            "device_id": device.get("id") or self._device_id,
             "ip": client.get("ip"),
             "hostname": client.get("hostname"),
             "signal_strength": client.get("signal") or client.get("signal_strength"),
             "ap_mac": client.get("ap_mac"),
             "last_seen": last_seen_iso,
-            "person": self._person,
-            "device_type": self._device_type,
+            "person": self._current_person(),
+            "device_type": device.get("type"),
             "source": "unifi_people_pointer",
         }
 
     def _is_connected(self) -> bool:
-        """Check if device is connected."""
-        return self.coordinator.is_device_online(self._mac)
+        """Check if device is connected using the current configured MAC."""
+        mac = self._current_mac()
+        if mac and self.coordinator.is_device_online(mac):
+            return True
+        device = self._current_device()
+        device_id = (device or {}).get("id") or self._device_id
+        if device_id and device_id in getattr(
+            self.coordinator, "_online_device_ids_cache", set()
+        ):
+            return True
+        return False
 
     @callback
     def _handle_coordinator_update(self) -> None:

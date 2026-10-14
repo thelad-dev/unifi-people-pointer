@@ -51,12 +51,7 @@ def parse_clients(raw_data: list[dict[str, Any]] | None) -> list[dict[str, Any]]
 
         hostname = entry.get("hostname")
         if hostname is None or not str(hostname).strip():
-            hostname = (
-                entry.get("name")
-                or entry.get("hostName")
-                or entry.get("oui")
-                or ""
-            )
+            hostname = entry.get("name") or entry.get("hostName") or ""
 
         signal = entry.get("signal")
         if signal is None:
