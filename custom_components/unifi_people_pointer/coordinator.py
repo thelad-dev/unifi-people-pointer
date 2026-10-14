@@ -487,6 +487,21 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         await self.async_request_refresh()
 
+    def _hostname_match_seeds(
+        self, mac_n: str, device_name: str | None
+    ) -> list[str]:
+        """Build hostname_match tokens from live client and optional name."""
+        seeds: list[str] = []
+        client = self.async_get_client_by_mac(mac_n) or self._clients_by_mac.get(mac_n)
+        if client:
+            host = str(client.get("hostname") or "").strip()
+            if host:
+                seeds.append(host)
+        name = str(device_name or "").strip()
+        if name and name not in seeds and name != mac_n:
+            seeds.append(name)
+        return seeds
+
     def _assign_device_sync(
         self,
         mac: str,
@@ -502,6 +517,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             None,
         )
         device_id = existing["id"] if existing else f"dev-{mac_n.replace(':', '')}"
+        seeds = self._hostname_match_seeds(mac_n, device_name)
         if existing is None:
             devices.append(
                 {
@@ -509,7 +525,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "name": device_name or mac_n,
                     "type": "other",
                     "mac": mac_n,
-                    "hostname_match": [],
+                    "hostname_match": list(seeds),
                     "track": True,
                     "notes": f"assigned as {device_type}",
                 }
@@ -518,6 +534,19 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             existing["track"] = True
             if device_name:
                 existing["name"] = device_name
+            current = [
+                str(p).strip()
+                for p in (existing.get("hostname_match") or [])
+                if str(p).strip()
+            ]
+            if not current and seeds:
+                existing["hostname_match"] = list(seeds)
+            elif seeds:
+                merged = list(current)
+                for seed in seeds:
+                    if seed not in merged:
+                        merged.append(seed)
+                existing["hostname_match"] = merged
         devices_data["devices"] = devices
         self._write_json(self.storage_path / DEVICES_FILE, devices_data)
 
