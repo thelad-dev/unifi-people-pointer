@@ -211,3 +211,31 @@ class TestDeviceMatcher:
         )
         assert partial is not None
         assert partial["id"] == "seb-phone"
+
+    def test_name_exact_yields_to_peer_hostname_match(self):
+        """hostname_match identity beats a peer display-name equality."""
+        from custom_components.unifi_people_pointer.device_matcher import (
+            exact_matching_devices,
+            match_device,
+        )
+
+        devices = [
+            {
+                "id": "seb-phone",
+                "name": "Sebastian Phone",
+                "mac": "aa:bb:cc:dd:ee:02",
+                "hostname_match": ["iPhone-SK"],
+                "track": True,
+            },
+            {
+                "id": "jan-phone",
+                "name": "iPhone-SK",
+                "mac": "aa:bb:cc:dd:ee:01",
+                "hostname_match": ["iPhone-JD"],
+                "track": True,
+            },
+        ]
+        client = {"mac": "11:22:33:44:55:66", "hostname": "iPhone-SK"}
+        hits = exact_matching_devices(client, devices)
+        assert [d["id"] for d in hits] == ["seb-phone"]
+        assert match_device(client, devices)["id"] == "seb-phone"

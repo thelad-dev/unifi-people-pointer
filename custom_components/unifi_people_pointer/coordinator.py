@@ -38,9 +38,12 @@ from .const import (
 )
 from .data_loader import DataLoader, load_devices, load_people
 from .device_matcher import (
+    exact_matching_devices,
+    is_tracked,
     match_device,
     match_device_partial,
     normalize_hostname_match,
+    partial_matching_devices,
 )
 from .presence import _online_device_ids, determine_presence, person_owns_device
 
@@ -438,9 +441,21 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return the live UniFi client matching a configured device."""
         if not device:
             return None
-        alone = [device]
+        device_id = device.get("id")
+        tracked = [
+            d
+            for d in self.devices
+            if isinstance(d, dict) and d.get("id") and is_tracked(d)
+        ]
+        if not tracked:
+            tracked = [device]
         for client in self._all_clients:
-            if match_device(client, alone) or match_device_partial(client, alone):
+            exact_hits = exact_matching_devices(client, tracked)
+            if exact_hits:
+                if any(hit.get("id") == device_id for hit in exact_hits):
+                    return client
+                continue
+            if partial_matching_devices(client, [device]):
                 return client
         return None
 

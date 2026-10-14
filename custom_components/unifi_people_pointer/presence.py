@@ -8,7 +8,11 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from .api_parser import normalize_mac
-from .device_matcher import is_tracked, match_device, match_device_partial
+from .device_matcher import (
+    exact_matching_devices,
+    is_tracked,
+    partial_matching_devices,
+)
 
 
 def _device_by_id(devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -72,21 +76,28 @@ def _online_device_ids(
 ) -> set[str]:
     """Return tracked device ids that match any online client.
 
-    Matching is device-centric so overlapping hostname patterns on multiple
-    tracked devices can all count as online for the same client.
+    For each client: if any tracked device exact-matches, only those exact hits
+    count. Partial hostname tokens apply only when the client has no exact owner.
+    Multiple partial siblings can still share one client when nothing exact-matches.
     """
+    tracked = [
+        d
+        for d in devices
+        if isinstance(d, dict) and d.get("id") and is_tracked(d)
+    ]
     online: set[str] = set()
-    for device in devices:
-        if not isinstance(device, dict):
+    for client in clients:
+        exact_hits = exact_matching_devices(client, tracked)
+        if exact_hits:
+            for device in exact_hits:
+                device_id = device.get("id")
+                if device_id:
+                    online.add(device_id)
             continue
-        device_id = device.get("id")
-        if not device_id or not is_tracked(device):
-            continue
-        alone = [device]
-        for client in clients:
-            if match_device(client, alone) or match_device_partial(client, alone):
+        for device in partial_matching_devices(client, tracked):
+            device_id = device.get("id")
+            if device_id:
                 online.add(device_id)
-                break
     return online
 
 
