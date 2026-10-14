@@ -53,7 +53,7 @@ Hinweis: Frühere 404-Fehler beim Hinzufügen lagen oft am damals privaten Repo.
 3. Gib deine UniFi Controller Details ein:
    - **Host**: IP oder Hostname, z.B. `192.168.1.1` (IPv6 ohne Klammern; die Integration setzt sie in der URL)
    - **API-Token**: Erstelle einen unter Einstellungen → Admins → API Token
-   - **SSL-Zertifikat prüfen**: Standard an; bei selbstsignierten Zertifikaten aus
+   - **SSL-Zertifikat prüfen**: Standard aus (lokales UniFi-Zertifikat); nur bei gültigem Zertifikat einschalten
 
 4. Optional unter **Optionen konfigurieren**:
    - **Scan-Intervall**: Wie oft nach Geräten gesucht wird (Standard: 45s, Bereich 10–600)
@@ -108,11 +108,13 @@ Die Integration speichert Konfiguration in JSON-Dateien unter `/config/unifi_peo
 
 Die Integration bietet folgende Services:
 
-- `unifi_people_pointer.assign_device` - Gerät einer Person zuweisen (aktualisiert Presence und Tracker ohne die Integration neu zu laden)
-- `unifi_people_pointer.track_device` - Neues Gerät tracken (aktualisiert Presence und Tracker ohne die Integration neu zu laden)
-- `unifi_people_pointer.remove_device` - Gerät entfernen (aktualisiert Presence und Tracker ohne die Integration neu zu laden)
+- `unifi_people_pointer.assign_device` - Gerät einer Person zuweisen (exklusiv: entfernt die Kennung bei jeder anderen Person; aktualisiert Presence und Tracker ohne Reload)
+- `unifi_people_pointer.track_device` - Neues Gerät tracken (aktualisiert Presence und Tracker ohne Reload)
+- `unifi_people_pointer.remove_device` - Gerät entfernen (aktualisiert Presence und Tracker ohne Reload)
 - `unifi_people_pointer.scan_now` - Sofortiges Netzwerk-Scan
-- `unifi_people_pointer.claim_unknown_device` - Unbekanntes Gerät beanspruchen (aktualisiert Presence und Tracker ohne die Integration neu zu laden)
+- `unifi_people_pointer.claim_unknown_device` - Unbekanntes Gerät beanspruchen (exklusiv wie assign; aktualisiert Presence und Tracker ohne Reload)
+
+Manuelle Änderungen an `people.json` / `devices.json` greift der nächste Poll auf (kein Config-Entry-Reload nötig). Entity-IDs folgen dem Anzeigenamen, z. B. `device_tracker.sebastian`, `device_tracker.iphone_sebastian`, plus `sensor.unknown_wifi_clients` / `sensor.guest_wifi_clients`. Templates: `states()` / `state_attr()` auf diesen Entities - siehe [docs/examples.md](docs/examples.md).
 
 #### 📊 Events
 
@@ -203,7 +205,7 @@ Note: Earlier 404 errors when adding the repository were often caused by the rep
 3. Enter your UniFi Controller details:
    - **Host**: IP or hostname, e.g. `192.168.1.1` (IPv6 without brackets; the integration adds them in the URL)
    - **API token**: Create one under Settings → Admins → API Token
-   - **Verify SSL certificate**: On by default; turn off for self-signed certificates
+   - **Verify SSL certificate**: Off by default (local UniFi certificate); enable only with a valid certificate
 
 4. Optionally under **Configure**:
    - **Scan interval**: How often to scan for devices (default: 45s, range 10–600)
@@ -258,11 +260,13 @@ The integration stores configuration in JSON files under `/config/unifi_people_p
 
 The integration provides these services:
 
-- `unifi_people_pointer.assign_device` - Assign device to person (refreshes presence and trackers without unloading the integration)
-- `unifi_people_pointer.track_device` - Track new device (refreshes presence and trackers without unloading the integration)
-- `unifi_people_pointer.remove_device` - Remove device (refreshes presence and trackers without unloading the integration)
+- `unifi_people_pointer.assign_device` - Assign device to person (exclusive: detaches the id from every other person; refreshes presence and trackers without reload)
+- `unifi_people_pointer.track_device` - Track new device (refreshes presence and trackers without reload)
+- `unifi_people_pointer.remove_device` - Remove device (refreshes presence and trackers without reload)
 - `unifi_people_pointer.scan_now` - Immediate network scan
-- `unifi_people_pointer.claim_unknown_device` - Claim unknown device (refreshes presence and trackers without unloading the integration)
+- `unifi_people_pointer.claim_unknown_device` - Claim unknown device (exclusive like assign; refreshes presence and trackers without reload)
+
+Manual edits to `people.json` / `devices.json` are picked up on the next poll (no config-entry reload required). Entity IDs follow the display name, e.g. `device_tracker.sebastian`, `device_tracker.iphone_sebastian`, plus `sensor.unknown_wifi_clients` / `sensor.guest_wifi_clients`. Templates: `states()` / `state_attr()` on those entities - see [docs/examples.md](docs/examples.md).
 
 #### 📊 Events
 

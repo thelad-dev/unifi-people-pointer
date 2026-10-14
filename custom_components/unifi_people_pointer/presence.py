@@ -81,9 +81,7 @@ def _online_device_ids(
     Multiple partial siblings can still share one client when nothing exact-matches.
     """
     tracked = [
-        d
-        for d in devices
-        if isinstance(d, dict) and d.get("id") and is_tracked(d)
+        d for d in devices if isinstance(d, dict) and d.get("id") and is_tracked(d)
     ]
     online: set[str] = set()
     for client in clients:

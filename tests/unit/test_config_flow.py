@@ -263,6 +263,7 @@ class TestValidateApiConnectionUrl:
         )
         assert result == {"sites": ["default"]}
 
+
 def test_default_verify_ssl_is_false():
     from custom_components.unifi_people_pointer.const import DEFAULT_VERIFY_SSL
 

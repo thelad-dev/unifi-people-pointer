@@ -7,6 +7,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+
 from .const import DEFAULT_EVENT_DEBOUNCE, DOMAIN
 from .coordinator import UniFiPeoplePointerCoordinator
 from .events import UniFiEventManager
@@ -24,9 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = UniFiPeoplePointerCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
 
-    debounce = int(
-        entry.options.get("event_debounce", DEFAULT_EVENT_DEBOUNCE)
-    )
+    debounce = int(entry.options.get("event_debounce", DEFAULT_EVENT_DEBOUNCE))
     event_manager = UniFiEventManager(hass, debounce_seconds=debounce)
 
     hass.data[DOMAIN][entry.entry_id] = {
@@ -73,11 +72,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "unknown_first_seen",
             "unknown_dismissed",
         )
-        remaining = [
-            key
-            for key in hass.data.get(DOMAIN, {})
-            if key not in shared_keys
-        ]
+        remaining = [key for key in hass.data.get(DOMAIN, {}) if key not in shared_keys]
         if not remaining:
             event_manager = hass.data.get(DOMAIN, {}).get("event_manager")
             if event_manager is not None:

@@ -94,10 +94,12 @@ async def async_setup_entry(
         )
 
     known_people = {
-        p.get("id") for p in coordinator.people if p.get("id")
+        str(p.get("id")) for p in coordinator.people if p.get("id") is not None
     }
     known_devices = {
-        d.get("id") for d in coordinator.devices if isinstance(d, dict) and d.get("id")
+        str(d.get("id"))
+        for d in coordinator.devices
+        if isinstance(d, dict) and d.get("id") is not None
     }
     coordinator.register_tracker_platform(
         async_add_entities, known_people, known_devices
@@ -113,7 +115,9 @@ async def async_setup_entry(
         )
 
 
-class UniFiPersonTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity):
+class UniFiPersonTracker(
+    CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity
+):
     """Representation of a UniFi Person Tracker."""
 
     _attr_has_entity_name = False
@@ -181,9 +185,7 @@ class UniFiPersonTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
             "source": "unifi_people_pointer",
         }
 
-    def _current_device_macs(
-        self, presence: dict[str, Any]
-    ) -> tuple[str, list[str]]:
+    def _current_device_macs(self, presence: dict[str, Any]) -> tuple[str, list[str]]:
         """Resolve primary/secondary MACs from live coordinator config."""
         devices = list(presence.get("devices") or [])
         if not devices:
@@ -203,11 +205,7 @@ class UniFiPersonTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
         if not macs:
             # Fallback: people.json device_ids against current devices list.
             person = next(
-                (
-                    p
-                    for p in self.coordinator.people
-                    if p.get("id") == self._person_id
-                ),
+                (p for p in self.coordinator.people if p.get("id") == self._person_id),
                 None,
             )
             device_ids = list((person or {}).get("device_ids") or [])
@@ -234,7 +232,9 @@ class UniFiPersonTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
         self.async_write_ha_state()
 
 
-class UniFiDeviceTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity):
+class UniFiDeviceTracker(
+    CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity
+):
     """Representation of a UniFi Device Tracker."""
 
     _attr_has_entity_name = False

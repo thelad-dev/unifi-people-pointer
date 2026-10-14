@@ -39,9 +39,7 @@ def parse_clients(raw_data: list[dict[str, Any]] | None) -> list[dict[str, Any]]
         if not isinstance(entry, dict):
             continue
         mac_raw = (
-            entry.get("mac")
-            or entry.get("mac_address")
-            or entry.get("macAddress")
+            entry.get("mac") or entry.get("mac_address") or entry.get("macAddress")
         )
         if not mac_raw:
             continue
@@ -107,9 +105,7 @@ def parse_clients(raw_data: list[dict[str, Any]] | None) -> list[dict[str, Any]]
                 "essid": entry.get("essid")
                 or entry.get("ssid")
                 or entry.get("wlanNetworkName"),
-                "is_guest": bool(
-                    entry.get("is_guest", entry.get("isGuest", False))
-                ),
+                "is_guest": bool(entry.get("is_guest", entry.get("isGuest", False))),
                 "raw": entry,
             }
         )

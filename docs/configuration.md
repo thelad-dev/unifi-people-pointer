@@ -21,7 +21,7 @@ Die Integration speichert Host, API-Token und SSL-Verify im Config Entry (UI-Set
 
 ### 1. API-Zugriff (Config Flow und optional `.env`)
 
-**In Home Assistant:** Integration hinzufügen und Host, API-Token sowie SSL-Prüfung eingeben. Der Token landet im Config Entry, nicht in `.env`.
+**In Home Assistant:** Integration hinzufügen und Host, API-Token sowie SSL-Prüfung eingeben (`verify_ssl` Standard: aus). Der Token landet im Config Entry, nicht in `.env`.
 
 **Für lokale curl-/Doku-Tests** eine `.env` im Repo anlegen:
 
@@ -212,7 +212,7 @@ IEEE OUI-Präfixe für Smartphone-Hersteller. **Normalerweise unverändert lasse
 
 **Verwendung:**
 
-Wenn `devices.json` ein Gerät mit `"manufacturer_id": "apple"` definiert, wird beim Matching auch gegen die OUI-Präfixe geprüft.
+`manufacturer_id` und `manufacturers.json` sind optionaler OUI-Hinweis / Discovery - nicht Presence-Quelle. Match-Reihenfolge und Grenzen: [datenmodell.md](datenmodell.md).
 
 ⚠️ **Hinweis:** Bei private MAC-Adressen ist das OUI oft leer → `hostname_match` verwenden!
 
@@ -220,19 +220,27 @@ Wenn `devices.json` ein Gerät mit `"manufacturer_id": "apple"` definiert, wird 
 
 #### Entities
 
-Die Integration erstellt automatisch:
+Entity-IDs folgen dem Anzeigenamen (`name` in JSON). Die Integration erstellt:
 
-1. **Device Tracker** für jede Person:
+1. **Device Tracker** pro Person (Presence home/not_home), z. B.:
    ```yaml
-   device_tracker.unifi_person_max
-   device_tracker.unifi_person_sarah
+   device_tracker.max
+   device_tracker.sarah
    ```
 
-2. **Binary Sensor** für jedes Gerät:
+2. **Device Tracker** pro getracktem Gerät, z. B.:
    ```yaml
-   binary_sensor.unifi_device_iphone_max
-   binary_sensor.unifi_device_watch_1
+   device_tracker.iphone_max
+   device_tracker.watch_1
    ```
+
+3. **Sensoren** für unbekannte und Gast-Clients:
+   ```yaml
+   sensor.unknown_wifi_clients
+   sensor.guest_wifi_clients
+   ```
+
+Templates und Automationen nutzen `states()` / `state_attr()` auf diesen Entities (keine Template-Helpers). `assign_device` / `claim_unknown_device` sind **exklusiv**: die Gerätekennung wird bei jeder anderen Person entfernt. JSON-Edits greift der nächste Poll auf; Services laden den Config-Entry nicht neu.
 
 #### Automationen
 
@@ -242,7 +250,7 @@ automation:
   - alias: "Willkommen Max"
     trigger:
       - platform: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         to: "home"
     action:
       - service: notify.mobile_app
@@ -256,17 +264,17 @@ automation:
   - alias: "Niemand zu Hause → Licht aus"
     trigger:
       - platform: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         to: "not_home"
       - platform: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         to: "not_home"
     condition:
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
     action:
       - service: light.turn_off
@@ -293,7 +301,7 @@ logger:
 
 #### Mehrere UniFi-Sites
 
-Unterstützung kommt in v0.2.0. Aktuell: eine Site (Standard-Site).
+Aktuell eine Site (Standard-Site). Multi-Site ist nicht implementiert.
 
 ### 7. Validierung
 
@@ -311,8 +319,7 @@ curl -sk -H "X-API-KEY: $unifi_api_token" \
      "https://192.168.88.1/proxy/network/integration/v1/sites"
 ```
 
-**Integration neu laden:**
-Settings → Devices & Services → UniFi People Pointer → ⚙️ → Reload
+**JSON-Änderungen übernehmen:** Der nächste Poll (oder `scan_now`) lädt `people.json` / `devices.json` neu und synchronisiert Tracker-Entities. Ein manueller Config-Entry-Reload ist dafür nicht nötig.
 
 ---
 
@@ -333,7 +340,7 @@ The integration stores host, API token, and SSL verify in the config entry (UI s
 
 ### 1. API access (config flow and optional `.env`)
 
-**In Home Assistant:** Add the integration and enter host, API token, and SSL verification. The token is stored in the config entry, not in `.env`.
+**In Home Assistant:** Add the integration and enter host, API token, and SSL verification (`verify_ssl` default: off). The token is stored in the config entry, not in `.env`.
 
 **For local curl/doc tests**, create a `.env` in the repo:
 
@@ -524,7 +531,7 @@ IEEE OUI prefixes for smartphone manufacturers. **Usually leave unchanged.**
 
 **Usage:**
 
-When `devices.json` defines a device with `"manufacturer_id": "apple"`, matching also checks against OUI prefixes.
+`manufacturer_id` and `manufacturers.json` are optional OUI hints / discovery - not a presence source. Match order and limits: [datenmodell.md](datenmodell.md).
 
 ⚠️ **Note:** With private MAC addresses, OUI is often empty → use `hostname_match`!
 
@@ -532,19 +539,27 @@ When `devices.json` defines a device with `"manufacturer_id": "apple"`, matching
 
 #### Entities
 
-The integration automatically creates:
+Entity IDs follow the display name (`name` in JSON). The integration creates:
 
-1. **Device Tracker** for each person:
+1. **Device tracker** per person (presence home/not_home), e.g.:
    ```yaml
-   device_tracker.unifi_person_max
-   device_tracker.unifi_person_sarah
+   device_tracker.max
+   device_tracker.sarah
    ```
 
-2. **Binary Sensor** for each device:
+2. **Device tracker** per tracked device, e.g.:
    ```yaml
-   binary_sensor.unifi_device_iphone_max
-   binary_sensor.unifi_device_watch_1
+   device_tracker.iphone_max
+   device_tracker.watch_1
    ```
+
+3. **Sensors** for unknown and guest clients:
+   ```yaml
+   sensor.unknown_wifi_clients
+   sensor.guest_wifi_clients
+   ```
+
+Templates and automations use `states()` / `state_attr()` on these entities (no template helpers). `assign_device` / `claim_unknown_device` are **exclusive**: the device id is removed from every other person. JSON edits are picked up on the next poll; services do not reload the config entry.
 
 #### Automations
 
@@ -554,7 +569,7 @@ automation:
   - alias: "Welcome Max"
     trigger:
       - platform: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         to: "home"
     action:
       - service: notify.mobile_app
@@ -568,17 +583,17 @@ automation:
   - alias: "Nobody home → Lights off"
     trigger:
       - platform: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         to: "not_home"
       - platform: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         to: "not_home"
     condition:
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
     action:
       - service: light.turn_off
@@ -605,7 +620,7 @@ logger:
 
 #### Multiple UniFi Sites
 
-Support coming in v0.2.0. Currently: one site (default site).
+Currently one site (default site). Multi-site is not implemented.
 
 ### 7. Validation
 
@@ -623,8 +638,7 @@ curl -sk -H "X-API-KEY: $unifi_api_token" \
      "https://192.168.88.1/proxy/network/integration/v1/sites"
 ```
 
-**Reload integration:**
-Settings → Devices & Services → UniFi People Pointer → ⚙️ → Reload
+**Apply JSON changes:** The next poll (or `scan_now`) reloads `people.json` / `devices.json` and syncs tracker entities. A manual config-entry reload is not required for that.
 
 ---
 

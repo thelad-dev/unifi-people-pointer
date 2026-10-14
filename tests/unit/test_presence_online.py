@@ -9,7 +9,6 @@ from custom_components.unifi_people_pointer.presence import (
     determine_presence,
 )
 
-
 pytestmark = pytest.mark.unit
 
 
@@ -88,9 +87,7 @@ def test_name_exact_does_not_compete_with_hostname_match_peer() -> None:
             "track": True,
         },
     ]
-    clients = [
-        {"mac": "99:99:99:99:99:99", "hostname": "iPhone-SK", "is_wired": False}
-    ]
+    clients = [{"mac": "99:99:99:99:99:99", "hostname": "iPhone-SK", "is_wired": False}]
     assert _online_device_ids(devices, clients) == {"iphone-sk"}
 
 

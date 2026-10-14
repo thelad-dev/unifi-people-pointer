@@ -167,8 +167,8 @@ automation:
     trigger:
       - platform: state
         entity_id: 
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "home"
     action:
       - service: notify.mobile_app_{{ trigger.to_state.attributes.friendly_name | lower }}
@@ -186,8 +186,8 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "home"
     condition:
       - condition: time
@@ -214,17 +214,17 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "not_home"
         for: "00:15:00"  # 15 Minuten Verzögerung
     condition:
       # Alle Personen müssen weg sein
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
     action:
       - service: climate.set_preset_mode
@@ -243,8 +243,8 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "home"
     action:
       - service: climate.set_preset_mode
@@ -263,16 +263,16 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "not_home"
         for: "00:05:00"  # 5 Minuten Verzögerung
     condition:
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
       # Nur wenn Alarm nicht bereits aktiv
       - condition: state
@@ -296,15 +296,15 @@ automation:
     description: "Benachrichtigung an Eltern wenn Kind heimkommt"
     trigger:
       - platform: state
-        entity_id: device_tracker.unifi_person_lisa
+        entity_id: device_tracker.lisa
         to: "home"
     condition:
       # Nur wenn Eltern nicht zu Hause
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
       # Nur während Schulzeit (werktags, 13-17 Uhr)
       - condition: time
@@ -332,16 +332,16 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "not_home"
         for: "00:30:00"  # 30 Minuten warten
     condition:
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
       # Nur wochentags
       - condition: time
@@ -369,20 +369,20 @@ automation:
 type: entities
 title: 🏠 Anwesenheit
 entities:
-  - entity: device_tracker.unifi_person_max
+  - entity: device_tracker.max
     name: Max
     icon: mdi:account
-  - entity: device_tracker.unifi_person_sarah
+  - entity: device_tracker.sarah
     name: Sarah
     icon: mdi:account
-  - entity: device_tracker.unifi_person_lisa
+  - entity: device_tracker.lisa
     name: Lisa
     icon: mdi:account-child
   - type: divider
-  - entity: binary_sensor.unifi_device_iphone_max
+  - entity: device_tracker.iphone_max
     name: iPhone Max
     icon: mdi:cellphone
-  - entity: binary_sensor.unifi_device_watch_max
+  - entity: device_tracker.watch_max
     name: Watch Max
     icon: mdi:watch
 ```
@@ -392,14 +392,14 @@ entities:
 ```yaml
 type: conditional
 conditions:
-  - entity: device_tracker.unifi_person_max
+  - entity: device_tracker.max
     state: "home"
 card:
   type: markdown
   content: |
     ## 👋 Willkommen, Max!
     
-    Du bist seit {{ relative_time(states.device_tracker.unifi_person_max.last_changed) }} zu Hause.
+    Du bist seit {{ relative_time(states.device_tracker.max.last_changed) }} zu Hause.
 ```
 
 #### 3. Glance Card
@@ -408,11 +408,11 @@ card:
 type: glance
 title: Wer ist zu Hause?
 entities:
-  - entity: device_tracker.unifi_person_max
+  - entity: device_tracker.max
     name: Max
-  - entity: device_tracker.unifi_person_sarah
+  - entity: device_tracker.sarah
     name: Sarah
-  - entity: device_tracker.unifi_person_lisa
+  - entity: device_tracker.lisa
     name: Lisa
 show_name: true
 show_state: true
@@ -437,16 +437,16 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "not_home"
     condition:
       # Beide Bewohner weg
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
       # Aber KEIN Gast-Modus
       - condition: state
@@ -467,7 +467,7 @@ automation:
   - alias: "Max im Büro angekommen"
     trigger:
       - platform: zone
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         zone: zone.office
         event: enter
     action:
@@ -604,8 +604,8 @@ automation:
     trigger:
       - platform: state
         entity_id: 
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "home"
     action:
       - service: notify.mobile_app_{{ trigger.to_state.attributes.friendly_name | lower }}
@@ -623,8 +623,8 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "home"
     condition:
       - condition: time
@@ -651,17 +651,17 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "not_home"
         for: "00:15:00"  # 15 minutes delay
     condition:
       # Everyone must be away
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
     action:
       - service: climate.set_preset_mode
@@ -680,16 +680,16 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "not_home"
         for: "00:05:00"  # 5 minutes delay
     condition:
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
       # Only if alarm is not already active
       - condition: state
@@ -714,16 +714,16 @@ automation:
     trigger:
       - platform: state
         entity_id:
-          - device_tracker.unifi_person_max
-          - device_tracker.unifi_person_sarah
+          - device_tracker.max
+          - device_tracker.sarah
         to: "not_home"
         for: "00:30:00"  # Wait 30 minutes
     condition:
       - condition: state
-        entity_id: device_tracker.unifi_person_max
+        entity_id: device_tracker.max
         state: "not_home"
       - condition: state
-        entity_id: device_tracker.unifi_person_sarah
+        entity_id: device_tracker.sarah
         state: "not_home"
       # Only weekdays
       - condition: time
@@ -751,17 +751,17 @@ automation:
 type: entities
 title: 🏠 Presence
 entities:
-  - entity: device_tracker.unifi_person_max
+  - entity: device_tracker.max
     name: Max
     icon: mdi:account
-  - entity: device_tracker.unifi_person_sarah
+  - entity: device_tracker.sarah
     name: Sarah
     icon: mdi:account
   - type: divider
-  - entity: binary_sensor.unifi_device_iphone_max
+  - entity: device_tracker.iphone_max
     name: iPhone Max
     icon: mdi:cellphone
-  - entity: binary_sensor.unifi_device_watch_max
+  - entity: device_tracker.watch_max
     name: Watch Max
     icon: mdi:watch
 ```
@@ -771,14 +771,14 @@ entities:
 ```yaml
 type: conditional
 conditions:
-  - entity: device_tracker.unifi_person_max
+  - entity: device_tracker.max
     state: "home"
 card:
   type: markdown
   content: |
     ## 👋 Welcome, Max!
     
-    You've been home for {{ relative_time(states.device_tracker.unifi_person_max.last_changed) }}.
+    You've been home for {{ relative_time(states.device_tracker.max.last_changed) }}.
 ```
 
 ---

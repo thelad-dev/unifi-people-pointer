@@ -12,7 +12,6 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.unifi_people_pointer.const import DOMAIN, STORAGE_DIR
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -67,9 +66,7 @@ async def test_setup_creates_person_and_device_trackers(
     assert hass.states.get("device_tracker.iphone_jd") is not None
 
 
-async def test_setup_marks_person_away_when_no_clients(
-    hass, devices_data, people_data
-):
+async def test_setup_marks_person_away_when_no_clients(hass, devices_data, people_data):
     """Person trackers go not_home when UniFi returns no clients."""
     storage = Path(hass.config.path(STORAGE_DIR))
     storage.mkdir(parents=True, exist_ok=True)
@@ -137,9 +134,7 @@ async def test_scan_picks_up_devices_json_change(
             if device["id"] == "iphone-jd":
                 device["mac"] = "de:ad:be:ef:00:01"
                 device["hostname_match"] = ["__no_such_host__"]
-        (storage / "devices.json").write_text(
-            json.dumps(patched), encoding="utf-8"
-        )
+        (storage / "devices.json").write_text(json.dumps(patched), encoding="utf-8")
 
         coordinator = hass.data[DOMAIN]["coordinator"]
         await coordinator.async_request_refresh()

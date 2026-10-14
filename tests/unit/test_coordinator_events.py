@@ -13,7 +13,6 @@ from custom_components.unifi_people_pointer.coordinator import (
     UniFiPeoplePointerCoordinator,
 )
 
-
 pytestmark = pytest.mark.unit
 
 
@@ -222,9 +221,7 @@ async def test_assign_does_not_seed_friendly_name_as_partial(hass, tmp_path) -> 
     )
     coordinator._loader.reload()
 
-    await coordinator.assign_device(
-        jan_mac, "janine", "primary", device_name="iPhone"
-    )
+    await coordinator.assign_device(jan_mac, "janine", "primary", device_name="iPhone")
 
     devices = coordinator.devices
     jan_dev = next(d for d in devices if d.get("mac") == jan_mac)
@@ -234,9 +231,9 @@ async def test_assign_does_not_seed_friendly_name_as_partial(hass, tmp_path) -> 
 
     assert coordinator.get_person_state("sebastian") == "home"
     assert coordinator.get_person_state("janine") == "home"
-    jan_online = (
-        coordinator.get_person_presence("janine") or {}
-    ).get("online_device_ids") or []
+    jan_online = (coordinator.get_person_presence("janine") or {}).get(
+        "online_device_ids"
+    ) or []
     assert "iphone-sk" not in jan_online
     assert any(str(i).startswith("dev-") or i == jan_dev.get("id") for i in jan_online)
     _stop_coordinator(coordinator)

@@ -54,7 +54,10 @@ def _host_for_url(host: str) -> str:
     """Return host as an HTTP URL authority, bracketing IPv6 literals."""
     if ":" in host and not host.startswith("["):
         # crude IPv6 detect without importing ipaddress again
-        if host.count(":") >= 2 and not host.replace(":", "").replace(".", "").isalnum():
+        if (
+            host.count(":") >= 2
+            and not host.replace(":", "").replace(".", "").isalnum()
+        ):
             return f"[{host}]"
         # still try: if looks like ipv6
         try:
@@ -73,9 +76,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize coordinator."""
         self.config_entry = config_entry
-        scan = int(
-            config_entry.options.get("scan_interval", DEFAULT_POLL_INTERVAL)
-        )
+        scan = int(config_entry.options.get("scan_interval", DEFAULT_POLL_INTERVAL))
         super().__init__(
             hass,
             _LOGGER,
@@ -127,9 +128,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Recompute presence indexes from config + client snapshot."""
         wireless = filter_wireless_only(all_clients)
         self._all_clients = all_clients
-        self._clients_by_mac = {
-            c["mac"]: c for c in all_clients if c.get("mac")
-        }
+        self._clients_by_mac = {c["mac"]: c for c in all_clients if c.get("mac")}
         devices = self.devices
         self._devices_by_id = {
             d["id"]: d for d in devices if isinstance(d, dict) and d.get("id")
@@ -175,23 +174,25 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._device_event_macs[key] = mac
 
         now_device_owners: dict[str, str | None] = {}
-        online_device_meta: dict[str, tuple[str, dict[str, Any], dict[str, Any] | None]] = {}
+        online_device_meta: dict[
+            str, tuple[str, dict[str, Any], dict[str, Any] | None]
+        ] = {}
         for device_id in now_online_ids:
             key = str(device_id)
-            device = self._devices_by_id.get(device_id) or {}
-            client = self._live_client_for_device(device)
+            cfg_device = self._devices_by_id.get(device_id) or {}
+            live_client = self._live_client_for_device(cfg_device)
             mac = self._device_event_macs.get(key, "")
             if not mac:
-                if client and client.get("mac"):
-                    mac = str(client["mac"])
+                if live_client and live_client.get("mac"):
+                    mac = str(live_client["mac"])
                 else:
-                    mac = normalize_mac(str(device.get("mac") or ""))
+                    mac = normalize_mac(str(cfg_device.get("mac") or ""))
                 if not mac:
                     mac = key
                 self._device_event_macs[key] = mac
             person_id = self._person_id_for_device(key, mac)
             now_device_owners[key] = person_id
-            online_device_meta[key] = (mac, device, client)
+            online_device_meta[key] = (mac, cfg_device, live_client)
 
         event_manager = self.hass.data.get(DOMAIN, {}).get("event_manager")
         # After the first baseline, always process transitions/cancels whenever
@@ -212,9 +213,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     device_mac = self._device_event_macs.get(
                         device_id
                     ) or self._mac_for_device_id(device_id)
-                event_manager.fire_person_left(
-                    person=person_id, device=device_mac
-                )
+                event_manager.fire_person_left(person=person_id, device=device_mac)
 
             for person_id, row in self._presence_by_person.items():
                 was = previous.get(person_id, {}).get("is_home")
@@ -241,13 +240,11 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         person=person_id, device=device_mac
                     )
                 else:
-                    event_manager.fire_person_left(
-                        person=person_id, device=device_mac
-                    )
+                    event_manager.fire_person_left(person=person_id, device=device_mac)
 
             for device_id in now_online_ids:
                 key = str(device_id)
-                mac, device, client = online_device_meta[key]
+                mac, cfg_device, live_client = online_device_meta[key]
                 person_id = now_device_owners.get(key)
                 became_online = device_id not in self._prev_online_device_ids
                 owner_changed = (
@@ -260,24 +257,24 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if owner_changed:
                     event_manager.cancel_device_event(mac, EVENT_DEVICE_CONNECTED)
                 signal = None
-                if client is not None:
-                    signal = client.get("signal")
+                if live_client is not None:
+                    signal = live_client.get("signal")
                     if signal is None:
-                        signal = client.get("signal_strength")
+                        signal = live_client.get("signal_strength")
                 event_manager.fire_device_connected(
                     mac=mac,
                     person=person_id,
-                    device_type=device.get("type"),
-                    ap_name=(client or {}).get("ap_mac"),
+                    device_type=cfg_device.get("type"),
+                    ap_name=(live_client or {}).get("ap_mac"),
                     signal_strength=signal if isinstance(signal, int) else None,
                 )
 
             for device_id in self._prev_online_device_ids - now_online_ids:
                 key = str(device_id)
-                mac = self._device_event_macs.pop(key, None)
+                mac = self._device_event_macs.pop(key, "")
                 if not mac:
-                    device = self._devices_by_id.get(device_id) or {}
-                    mac = normalize_mac(str(device.get("mac") or "")) or key
+                    cfg_device = self._devices_by_id.get(device_id) or {}
+                    mac = normalize_mac(str(cfg_device.get("mac") or "")) or key
                 event_manager.cancel_device_event(mac, EVENT_DEVICE_CONNECTED)
 
             unknown_by_mac = {c["mac"]: c for c in unknown if c.get("mac")}
@@ -364,9 +361,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             site_id = self._site_id
 
             # Prefer classic live station list (richer fields).
-            classic_url = (
-                f"{base}/proxy/network/api/s/{self._site_key}/stat/sta"
-            )
+            classic_url = f"{base}/proxy/network/api/s/{self._site_key}/stat/sta"
             try:
                 async with session.get(
                     classic_url, headers=headers, ssl=ssl_param
@@ -391,7 +386,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             return payload
             except PermissionError:
                 raise
-            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError) as err:
+            except (
+                aiohttp.ClientError,
+                asyncio.TimeoutError,
+                ValueError,
+                TypeError,
+            ) as err:
                 _LOGGER.debug("Classic sta endpoint failed: %s", err)
 
             # Integration API fallback.
@@ -413,9 +413,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     return payload["data"]
                 if isinstance(payload, list):
                     return payload
-                raise ConnectionError(
-                    "UniFi clients API returned no client list"
-                )
+                raise ConnectionError("UniFi clients API returned no client list")
 
     async def _resolve_site(
         self,
@@ -430,16 +428,16 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if response.status in (401, 403):
                 raise PermissionError("Invalid API token")
             if response.status >= 400:
-                raise ConnectionError(f"UniFi sites API returned HTTP {response.status}")
+                raise ConnectionError(
+                    f"UniFi sites API returned HTTP {response.status}"
+                )
             payload = await response.json(content_type=None)
         if isinstance(payload, dict):
             for site in payload.get("data") or []:
                 if isinstance(site, dict) and site.get("id"):
                     site_id = str(site["id"])
                     site_key = (
-                        site.get("internalReference")
-                        or site.get("name")
-                        or "default"
+                        site.get("internalReference") or site.get("name") or "default"
                     )
                     return site_id, str(site_key)
         raise ConnectionError("No UniFi site id found")
@@ -587,7 +585,6 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return []
         return list(self.data.get("guest_clients") or [])
 
-
     def _read_devices_file(self) -> dict[str, Any]:
         """Read devices.json from disk without touching the shared loader."""
         path = self.storage_path / DEVICES_FILE
@@ -631,9 +628,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return seeds
 
     @staticmethod
-    def _merge_hostname_match(
-        existing: Any, seeds: list[str]
-    ) -> list[str]:
+    def _merge_hostname_match(existing: Any, seeds: list[str]) -> list[str]:
         """Merge seeds into hostname_match without wiping existing tokens."""
         current = normalize_hostname_match(existing)
         if not seeds:
@@ -860,8 +855,8 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         from .device_tracker import UniFiDeviceTracker, UniFiPersonTracker
 
-        known_people = getattr(self, "_known_person_ids", set())
-        known_devices = getattr(self, "_known_device_ids", set())
+        known_people: set[str] = set(getattr(self, "_known_person_ids", set()))
+        known_devices: set[str] = set(getattr(self, "_known_device_ids", set()))
         new_entities: list[Any] = []
         for person in self.people:
             person_id = person.get("id")
