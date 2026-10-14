@@ -1,7 +1,6 @@
 """Service handlers for UniFi People Pointer."""
 
 import logging
-from typing import Any
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
@@ -75,19 +74,6 @@ CLAIM_UNKNOWN_DEVICE_SCHEMA = vol.Schema(
 )
 
 
-async def _async_reload_entry(hass: HomeAssistant, coordinator: Any) -> None:
-    """Reload config entry so person/device trackers pick up JSON changes."""
-    entry = getattr(coordinator, "config_entry", None)
-    entry_id = getattr(entry, "entry_id", None)
-    if not entry_id:
-        _LOGGER.warning(
-            "JSON device change saved; tracker entities refresh only after a manual "
-            "config entry reload (no entry_id available)"
-        )
-        return
-    await hass.config_entries.async_reload(entry_id)
-
-
 def setup_services(hass: HomeAssistant) -> None:
     """Set up services for UniFi People Pointer."""
 
@@ -113,7 +99,6 @@ def setup_services(hass: HomeAssistant) -> None:
         try:
             await coordinator.assign_device(mac, person, device_type, device_name)
             _LOGGER.info("Successfully assigned device %s to %s", mac, person)
-            await _async_reload_entry(hass, coordinator)
         except Exception as err:
             _LOGGER.error("Error assigning device: %s", err)
             raise HomeAssistantError(f"Failed to assign device: {err}") from err
@@ -133,7 +118,6 @@ def setup_services(hass: HomeAssistant) -> None:
         try:
             await coordinator.track_device(mac, name, device_type)
             _LOGGER.info("Successfully tracking device %s", mac)
-            await _async_reload_entry(hass, coordinator)
         except Exception as err:
             _LOGGER.error("Error tracking device: %s", err)
             raise HomeAssistantError(f"Failed to track device: {err}") from err
@@ -151,7 +135,6 @@ def setup_services(hass: HomeAssistant) -> None:
         try:
             await coordinator.remove_device(mac)
             _LOGGER.info("Successfully removed device %s", mac)
-            await _async_reload_entry(hass, coordinator)
         except Exception as err:
             _LOGGER.error("Error removing device: %s", err)
             raise HomeAssistantError(f"Failed to remove device: {err}") from err
@@ -213,7 +196,6 @@ def setup_services(hass: HomeAssistant) -> None:
                 mac, person, device_type, device_name
             )
             _LOGGER.info("Successfully claimed device %s for %s", mac, person)
-            await _async_reload_entry(hass, coordinator)
         except Exception as err:
             _LOGGER.error("Error claiming device: %s", err)
             raise HomeAssistantError(f"Failed to claim device: {err}") from err

@@ -40,7 +40,7 @@ from .device_matcher import (
     match_device_partial,
     normalize_hostname_match,
 )
-from .presence import _online_device_ids, determine_presence
+from .presence import _online_device_ids, determine_presence, person_owns_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -117,7 +117,8 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch clients from UniFi and compute presence."""
         # Pick up people/devices.json edits without a full reload.
-        await self.hass.async_add_executor_job(self._loader.reload)
+        async with self._config_lock:
+            await self.hass.async_add_executor_job(self._loader.reload)
 
         try:
             raw_clients = await self._fetch_clients()
@@ -212,7 +213,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self._device_event_macs[str(device_id)] = mac
                 person_id = None
                 for person in self.people:
-                    if device_id in (person.get("device_ids") or []):
+                    if person_owns_device(
+                        person, device_id=str(device_id), device_mac=mac
+                    ):
                         person_id = person.get("id")
                         break
                 signal = None
@@ -491,7 +494,8 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.hass.async_add_executor_job(
                 self._assign_device_sync, mac, person, device_type, device_name
             )
-            await self.async_request_refresh()
+        await self.async_request_refresh()
+        await self.async_sync_tracker_entities()
 
     def _hostname_match_seeds(
         self, mac_n: str, device_name: str | None
@@ -531,6 +535,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         device_type: str,
         device_name: str | None,
     ) -> None:
+        self._loader.reload()
         mac_n = normalize_mac(mac)
         devices_data = self._loader.get_devices()
         devices = list(devices_data.get("devices") or [])
@@ -581,12 +586,33 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if device_id in other_ids:
                 other["device_ids"] = [i for i in other_ids if i != device_id]
             self._detach_mac_from_person(other, mac_n)
+        devices_by_mac = {
+            normalize_mac(str(d.get("mac") or "")): d
+            for d in devices
+            if isinstance(d, dict) and d.get("mac")
+        }
         ids = [i for i in (target.get("device_ids") or []) if i != device_id]
+        legacy_macs: list[str] = []
+        if target.get("primary_device"):
+            legacy_macs.append(str(target.get("primary_device")))
+        for m in target.get("secondary_devices") or []:
+            if m:
+                legacy_macs.append(str(m))
+        for owned_mac in legacy_macs:
+            owned_n = normalize_mac(owned_mac)
+            if not owned_n or owned_n == mac_n:
+                continue
+            owned_dev = devices_by_mac.get(owned_n)
+            owned_id = owned_dev.get("id") if owned_dev else None
+            if owned_id and owned_id not in ids and owned_id != device_id:
+                ids.append(owned_id)
         if device_type == "primary":
             ids.insert(0, device_id)
         else:
             ids.append(device_id)
         target["device_ids"] = ids
+        target["primary_device"] = None
+        target["secondary_devices"] = []
         self._write_json(self.storage_path / PEOPLE_FILE, people_data)
         self._loader.reload()
 
@@ -598,9 +624,11 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.hass.async_add_executor_job(
                 self._track_device_sync, mac, name, device_type
             )
-            await self.async_request_refresh()
+        await self.async_request_refresh()
+        await self.async_sync_tracker_entities()
 
     def _track_device_sync(self, mac: str, name: str, device_type: str) -> None:
+        self._loader.reload()
         mac_n = normalize_mac(mac)
         devices_data = self._loader.get_devices()
         devices = list(devices_data.get("devices") or [])
@@ -634,7 +662,8 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Stop tracking / remove a device."""
         async with self._config_lock:
             await self.hass.async_add_executor_job(self._remove_device_sync, mac)
-            await self.async_request_refresh()
+        await self.async_request_refresh()
+        await self.async_sync_tracker_entities()
 
     @staticmethod
     def _detach_mac_from_person(person: dict[str, Any], mac_n: str) -> None:
@@ -659,6 +688,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             person["secondary_devices"] = kept_secondaries
 
     def _remove_device_sync(self, mac: str) -> None:
+        self._loader.reload()
         mac_n = normalize_mac(mac)
         devices_data = self._loader.get_devices()
         devices = list(devices_data.get("devices") or [])
@@ -694,6 +724,72 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     ) -> None:
         """Claim an unknown device for a person."""
         await self.assign_device(mac, person, device_type, device_name)
+
+    def register_tracker_platform(
+        self,
+        add_entities: Any,
+        known_person_ids: set[str],
+        known_device_ids: set[str],
+    ) -> None:
+        """Store device_tracker platform hooks for dynamic entity adds."""
+        self._tracker_add_entities = add_entities
+        self._known_person_ids = set(known_person_ids)
+        self._known_device_ids = set(known_device_ids)
+
+    async def async_sync_tracker_entities(self) -> None:
+        """Add tracker entities for newly configured people/devices."""
+        add_entities = getattr(self, "_tracker_add_entities", None)
+        if add_entities is None:
+            return
+        from .device_tracker import UniFiDeviceTracker, UniFiPersonTracker
+
+        known_people = getattr(self, "_known_person_ids", set())
+        known_devices = getattr(self, "_known_device_ids", set())
+        new_entities: list[Any] = []
+        for person in self.people:
+            person_id = person.get("id")
+            if not person_id or person_id in known_people:
+                continue
+            new_entities.append(
+                UniFiPersonTracker(
+                    self,
+                    {
+                        "id": person_id,
+                        "name": person.get("name") or person_id,
+                        "ha_person": person.get("ha_person"),
+                    },
+                )
+            )
+            known_people.add(person_id)
+        for device in self.devices:
+            device_id = device.get("id")
+            mac = normalize_mac(str(device.get("mac") or ""))
+            if not device_id or device_id in known_devices:
+                continue
+            if not mac and not device_id:
+                continue
+            person_id = None
+            for person in self.people:
+                if person_owns_device(person, device_id=device_id, device_mac=mac):
+                    person_id = person.get("id")
+                    break
+            new_entities.append(
+                UniFiDeviceTracker(
+                    self,
+                    {
+                        "id": device_id,
+                        "mac": mac,
+                        "name": device.get("name") or device_id or mac,
+                        "type": device.get("type"),
+                        "person": person_id,
+                    },
+                )
+            )
+            known_devices.add(device_id)
+        self._known_person_ids = known_people
+        self._known_device_ids = known_devices
+        if new_entities:
+            add_entities(new_entities)
 
     @staticmethod
     def _write_json(path: Path, data: dict[str, Any]) -> None:

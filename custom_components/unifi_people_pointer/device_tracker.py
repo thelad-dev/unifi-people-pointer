@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .api_parser import normalize_mac
 from .const import DOMAIN
 from .coordinator import UniFiPeoplePointerCoordinator
+from .presence import person_owns_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,11 +71,10 @@ async def async_setup_entry(
         if not device_id and not mac:
             continue
         person_id = None
-        if device_id:
-            for person in coordinator.people:
-                if device_id in (person.get("device_ids") or []):
-                    person_id = person.get("id")
-                    break
+        for person in coordinator.people:
+            if person_owns_device(person, device_id=device_id, device_mac=mac):
+                person_id = person.get("id")
+                break
         entities.append(
             UniFiDeviceTracker(
                 coordinator,
@@ -87,6 +87,16 @@ async def async_setup_entry(
                 },
             )
         )
+
+    known_people = {
+        p.get("id") for p in coordinator.people if p.get("id")
+    }
+    known_devices = {
+        d.get("id") for d in coordinator.devices if isinstance(d, dict) and d.get("id")
+    }
+    coordinator.register_tracker_platform(
+        async_add_entities, known_people, known_devices
+    )
 
     if entities:
         async_add_entities(entities)
@@ -266,10 +276,9 @@ class UniFiDeviceTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
         """Person id currently assigned to this device."""
         device = self._current_device()
         device_id = (device or {}).get("id") or self._device_id
-        if not device_id:
-            return None
+        mac = self._current_mac()
         for person in self.coordinator.people:
-            if device_id in (person.get("device_ids") or []):
+            if person_owns_device(person, device_id=device_id, device_mac=mac):
                 return person.get("id")
         return None
 

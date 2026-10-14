@@ -15,6 +15,53 @@ def _device_by_id(devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return {d["id"]: d for d in devices if isinstance(d, dict) and d.get("id")}
 
 
+def _ownership_macs(person: dict[str, Any]) -> list[str]:
+    """MAC list from primary_device + secondary_devices."""
+    macs: list[str] = []
+    primary = person.get("primary_device")
+    if primary:
+        macs.append(str(primary))
+    secondaries = person.get("secondary_devices") or []
+    if isinstance(secondaries, list):
+        macs.extend(str(m) for m in secondaries if m)
+    return macs
+
+
+def person_owns_device(
+    person: dict[str, Any],
+    device_id: str | None = None,
+    device_mac: str | None = None,
+) -> bool:
+    """True if person owns device via device_ids or primary/secondary MAC."""
+    if device_id and device_id in (person.get("device_ids") or []):
+        return True
+    mac_n = normalize_mac(str(device_mac or ""))
+    if not mac_n:
+        return False
+    return any(normalize_mac(m) == mac_n for m in _ownership_macs(person))
+
+
+def _device_ids_for_person(
+    person: dict[str, Any], devices: list[dict[str, Any]]
+) -> list[str]:
+    """Union device_ids with devices matched by primary/secondary MACs."""
+    device_ids = list(person.get("device_ids") or [])
+    seen = set(device_ids)
+    wanted = {normalize_mac(m) for m in _ownership_macs(person) if m}
+    if not wanted:
+        return device_ids
+    for device in devices:
+        if not isinstance(device, dict):
+            continue
+        device_id = device.get("id")
+        if not device_id or device_id in seen:
+            continue
+        if normalize_mac(str(device.get("mac") or "")) in wanted:
+            device_ids.append(device_id)
+            seen.add(device_id)
+    return device_ids
+
+
 def _online_device_ids(
     devices: list[dict[str, Any]],
     clients: list[dict[str, Any]],
@@ -55,24 +102,7 @@ def determine_presence(
         person_id = person.get("id")
         if not person_id:
             continue
-        device_ids = list(person.get("device_ids") or [])
-        # Alternate schema: primary/secondary MAC lists (either may be set).
-        if not device_ids:
-            macs: list[Any] = []
-            primary = person.get("primary_device")
-            if primary:
-                macs.append(primary)
-            secondaries = person.get("secondary_devices") or []
-            if isinstance(secondaries, list):
-                macs.extend(secondaries)
-            if macs:
-                wanted = {normalize_mac(str(m)) for m in macs if m}
-                for device in devices:
-                    device_id = device.get("id") if isinstance(device, dict) else None
-                    if not device_id:
-                        continue
-                    if normalize_mac(str(device.get("mac") or "")) in wanted:
-                        device_ids.append(device_id)
+        device_ids = _device_ids_for_person(person, devices)
 
         online_for_person = [d for d in device_ids if d in online_ids]
         is_home = len(online_for_person) > 0
