@@ -381,8 +381,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "notes": f"assigned as {device_type}",
                 }
             )
-            devices_data["devices"] = devices
-            self._write_json(self.storage_path / DEVICES_FILE, devices_data)
+        else:
+            existing["track"] = True
+            if device_name:
+                existing["name"] = device_name
+        devices_data["devices"] = devices
+        self._write_json(self.storage_path / DEVICES_FILE, devices_data)
 
         people_data = self._loader.get_people()
         people = list(people_data.get("people") or [])
@@ -395,13 +399,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             }
             people.append(target)
             people_data["people"] = people
-        ids = list(target.get("device_ids") or [])
-        if device_id not in ids:
-            if device_type == "primary":
-                ids.insert(0, device_id)
-            else:
-                ids.append(device_id)
-            target["device_ids"] = ids
+        ids = [i for i in (target.get("device_ids") or []) if i != device_id]
+        if device_type == "primary":
+            ids.insert(0, device_id)
+        else:
+            ids.append(device_id)
+        target["device_ids"] = ids
         self._write_json(self.storage_path / PEOPLE_FILE, people_data)
         self._loader.reload()
 

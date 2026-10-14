@@ -52,6 +52,9 @@ class UniFiUnknownClientsSensor(
         self._first_seen: dict[str, str] = domain_data.setdefault(
             "unknown_first_seen", {}
         )
+        self._dismissed: dict[str, str] = domain_data.setdefault(
+            "unknown_dismissed", {}
+        )
 
     async def async_added_to_hass(self) -> None:
         """Register coordinator listener and seed from current data."""
@@ -85,45 +88,57 @@ class UniFiUnknownClientsSensor(
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        now_iso = datetime.now().isoformat()
+        now = datetime.now()
+        now_iso = now.isoformat()
+        cutoff = now - timedelta(days=AUTO_DISMISS_DAYS)
         clients = list(self.coordinator.get_unknown_clients())
+        current_macs: set[str] = set()
+        kept: list[dict[str, Any]] = []
+        dismissed_count = 0
+
         for client in clients:
             mac = client.get("mac")
             if not mac:
                 continue
+            current_macs.add(mac)
+
+            # Stay hidden while continuously present after age-dismiss.
+            if mac in self._dismissed:
+                continue
+
             if mac not in self._first_seen:
                 self._first_seen[mac] = now_iso
             client["first_seen"] = self._first_seen[mac]
-        self._unknown_clients = clients
-        self._auto_dismiss_old_clients()
-        self.async_write_ha_state()
 
-    def _auto_dismiss_old_clients(self) -> None:
-        """Auto-dismiss unknown clients after configured days."""
-        cutoff = datetime.now() - timedelta(days=AUTO_DISMISS_DAYS)
-        original_count = len(self._unknown_clients)
-        kept = []
-        for client in self._unknown_clients:
-            first_seen = client.get("first_seen", datetime.now().isoformat())
             try:
-                seen_dt = datetime.fromisoformat(str(first_seen))
+                seen_dt = datetime.fromisoformat(str(self._first_seen[mac]))
             except ValueError:
                 kept.append(client)
                 continue
+
             if seen_dt > cutoff:
                 kept.append(client)
                 continue
-            mac = client.get("mac")
-            if mac:
+
+            self._dismissed[mac] = now_iso
+            dismissed_count += 1
+
+        # MAC left unknown (claimed/matched or offline): allow fresh cycle later.
+        for mac in list(self._first_seen):
+            if mac not in current_macs:
                 self._first_seen.pop(mac, None)
+        for mac in list(self._dismissed):
+            if mac not in current_macs:
+                self._dismissed.pop(mac, None)
+
         self._unknown_clients = kept
-        dismissed_count = original_count - len(self._unknown_clients)
         if dismissed_count > 0:
             _LOGGER.info(
                 "Auto-dismissed %d unknown clients older than %d days",
                 dismissed_count,
                 AUTO_DISMISS_DAYS,
             )
+        self.async_write_ha_state()
 
 
 class UniFiGuestClientsSensor(

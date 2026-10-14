@@ -73,6 +73,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "event_manager",
             "services_registered",
             "unknown_first_seen",
+            "unknown_dismissed",
         )
         remaining = [
             key
@@ -85,8 +86,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 event_manager.cancel_all()
             if hass.data.get(DOMAIN, {}).get("services_registered"):
                 unregister_services(hass)
-            # Keep unknown_first_seen across config-entry reload.
+            # Keep unknown client bookkeeping across config-entry reload.
             first_seen = hass.data.get(DOMAIN, {}).get("unknown_first_seen") or {}
-            hass.data[DOMAIN] = {"unknown_first_seen": first_seen}
+            dismissed = hass.data.get(DOMAIN, {}).get("unknown_dismissed") or {}
+            hass.data[DOMAIN] = {
+                "unknown_first_seen": first_seen,
+                "unknown_dismissed": dismissed,
+            }
 
     return unload_ok
