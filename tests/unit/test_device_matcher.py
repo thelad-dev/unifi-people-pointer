@@ -174,3 +174,40 @@ class TestDeviceMatcher:
         )
 
         assert manufacturer is None
+
+    def test_friendly_name_exact_match_only(self):
+        """Device display name matches hostname exactly, never as substring."""
+        from custom_components.unifi_people_pointer.device_matcher import (
+            match_device,
+            match_device_partial,
+        )
+
+        devices = [
+            {
+                "id": "jan-phone",
+                "name": "iPhone",
+                "mac": "aa:bb:cc:dd:ee:01",
+                "hostname_match": ["iPhone-JD"],
+                "track": True,
+            },
+            {
+                "id": "seb-phone",
+                "name": "Sebastian Phone",
+                "mac": "aa:bb:cc:dd:ee:02",
+                "hostname_match": ["iPhone-SK"],
+                "track": True,
+            },
+        ]
+
+        exact = match_device(
+            {"mac": "11:22:33:44:55:66", "hostname": "iPhone"}, devices
+        )
+        assert exact is not None
+        assert exact["id"] == "jan-phone"
+
+        # Substring of another phone's hostname must not claim via friendly name.
+        partial = match_device_partial(
+            {"mac": "11:22:33:44:55:66", "hostname": "iPhone-SK"}, devices
+        )
+        assert partial is not None
+        assert partial["id"] == "seb-phone"

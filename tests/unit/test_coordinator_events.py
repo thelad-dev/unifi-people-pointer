@@ -53,6 +53,12 @@ async def _make_coordinator(hass, tmp_path=None) -> UniFiPeoplePointerCoordinato
     return coordinator
 
 
+def _stop_coordinator(coordinator: UniFiPeoplePointerCoordinator) -> None:
+    """Cancel scheduled refresh handles left by mutate/publish paths."""
+    coordinator._async_unsub_refresh()
+    coordinator._debounced_refresh.async_cancel()
+
+
 def _set_config(
     coordinator: UniFiPeoplePointerCoordinator,
     *,
@@ -189,3 +195,117 @@ async def test_auth_failure_raises_after_last_good_rebuild(hass, tmp_path) -> No
 
     # Config/presence still recomputed from last-good clients before fail-closed.
     assert coordinator.get_person_state("janine") == "home"
+
+
+async def test_assign_does_not_seed_friendly_name_as_partial(hass, tmp_path) -> None:
+    """device_name is display-only; hostname_match keeps live UniFi hostname."""
+    coordinator = await _make_coordinator(hass, tmp_path=tmp_path)
+    seb_mac = "aa:bb:cc:dd:ee:10"
+    jan_mac = "aa:bb:cc:dd:ee:11"
+    coordinator._all_clients = [
+        _client(seb_mac, hostname="iPhone-SK"),
+        _client(jan_mac, hostname="iPhone-JD"),
+    ]
+    coordinator._clients_by_mac = {c["mac"]: c for c in coordinator._all_clients}
+    coordinator._rebuild_presence_state(list(coordinator._all_clients))
+
+    # Sebastian already owns the SK phone.
+    (tmp_path / STORAGE_DIR / "devices.json").write_text(
+        '{"version":1,"devices":[{"id":"iphone-sk","name":"Sebastian Phone",'
+        '"mac":"aa:bb:cc:dd:ee:10","hostname_match":["iPhone-SK"],"track":true}]}',
+        encoding="utf-8",
+    )
+    (tmp_path / STORAGE_DIR / "people.json").write_text(
+        '{"version":1,"people":[{"id":"sebastian","name":"Sebastian",'
+        '"device_ids":["iphone-sk"]}]}',
+        encoding="utf-8",
+    )
+    coordinator._loader.reload()
+
+    await coordinator.assign_device(
+        jan_mac, "janine", "primary", device_name="iPhone"
+    )
+
+    devices = coordinator.devices
+    jan_dev = next(d for d in devices if d.get("mac") == jan_mac)
+    assert jan_dev["name"] == "iPhone"
+    assert jan_dev.get("hostname_match") == ["iPhone-JD"]
+    assert "iPhone" not in (jan_dev.get("hostname_match") or [])
+
+    assert coordinator.get_person_state("sebastian") == "home"
+    assert coordinator.get_person_state("janine") == "home"
+    jan_online = (
+        coordinator.get_person_presence("janine") or {}
+    ).get("online_device_ids") or []
+    assert "iphone-sk" not in jan_online
+    assert any(str(i).startswith("dev-") or i == jan_dev.get("id") for i in jan_online)
+    _stop_coordinator(coordinator)
+
+
+async def test_assign_publishes_presence_before_refresh(hass, tmp_path) -> None:
+    """Mutate rebuild notifies listeners immediately, not only after UniFi fetch."""
+    coordinator = await _make_coordinator(hass, tmp_path=tmp_path)
+    mac = "aa:bb:cc:dd:ee:20"
+    coordinator._all_clients = [_client(mac, hostname="Pixel-J")]
+    coordinator._clients_by_mac = {mac: coordinator._all_clients[0]}
+    coordinator._rebuild_presence_state(list(coordinator._all_clients))
+
+    (tmp_path / STORAGE_DIR / "devices.json").write_text(
+        '{"version":1,"devices":[]}', encoding="utf-8"
+    )
+    (tmp_path / STORAGE_DIR / "people.json").write_text(
+        '{"version":1,"people":[]}', encoding="utf-8"
+    )
+    coordinator._loader.reload()
+
+    notified: list[object] = []
+
+    def _listener() -> None:
+        notified.append(coordinator.data)
+
+    coordinator.async_add_listener(_listener)
+
+    async def _slow_fetch():
+        # Should not be required for the first presence publish.
+        raise ConnectionError("network down")
+
+    coordinator._fetch_clients = _slow_fetch  # type: ignore[method-assign]
+
+    await coordinator.assign_device(mac, "sebastian", "primary", device_name="Pixel")
+
+    assert notified, "assign must publish via async_set_updated_data"
+    assert coordinator.get_person_state("sebastian") == "home"
+    assert coordinator.data is not None
+    assert any(
+        row.get("id") == "sebastian" and row.get("is_home")
+        for row in (coordinator.data.get("presence") or [])
+    )
+    _stop_coordinator(coordinator)
+
+
+async def test_integration_nonlist_payload_keeps_last_good(hass, tmp_path) -> None:
+    """Non-list integration payload must not wipe clients to all-offline."""
+    coordinator = await _make_coordinator(hass, tmp_path=tmp_path)
+    mac = "aa:bb:cc:dd:ee:30"
+    device = {
+        "id": "dev-b",
+        "name": "B",
+        "mac": mac,
+        "type": "phone",
+        "track": True,
+        "hostname_match": [],
+    }
+    people = [{"id": "janine", "name": "Janine", "device_ids": ["dev-b"]}]
+    _set_config(coordinator, people=people, devices=[device])
+    coordinator._rebuild_presence_state([_client(mac)])
+    assert coordinator.get_person_state("janine") == "home"
+
+    async def _bad_payload():
+        raise ConnectionError("UniFi clients API returned no client list")
+
+    coordinator._fetch_clients = _bad_payload  # type: ignore[method-assign]
+    coordinator._loader.reload = lambda: None
+
+    data = await coordinator._async_update_data()
+    assert coordinator.get_person_state("janine") == "home"
+    assert data["clients"]

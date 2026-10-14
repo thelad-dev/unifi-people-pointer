@@ -43,6 +43,9 @@ def match_device(
                 token = pattern.lower()
                 if token == host_l:
                     return device
+            name = str(device.get("name") or "").strip().lower()
+            if name and name == host_l:
+                return device
     return None
 
 
@@ -61,7 +64,7 @@ def match_device_partial(
     for device in devices:
         for pattern in normalize_hostname_match(device.get("hostname_match")):
             token = pattern.lower()
-            if token in host_l:
+            if token and token in host_l:
                 return device
     return None
 

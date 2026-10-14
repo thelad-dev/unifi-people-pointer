@@ -401,7 +401,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     return payload["data"]
                 if isinstance(payload, list):
                     return payload
-                return []
+                raise ConnectionError(
+                    "UniFi clients API returned no client list"
+                )
 
     async def _resolve_site(
         self,
@@ -588,23 +590,19 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._assign_device_sync, mac, person, device_type, device_name
             )
             self._loader.reload()
-            self._rebuild_presence_state(list(self._all_clients))
-        await self.async_request_refresh()
+            data = self._rebuild_presence_state(list(self._all_clients))
+            self.async_set_updated_data(data)
         await self.async_sync_tracker_entities()
+        await self.async_request_refresh()
 
-    def _hostname_match_seeds(
-        self, mac_n: str, device_name: str | None
-    ) -> list[str]:
-        """Build hostname_match tokens from live client and optional name."""
+    def _hostname_match_seeds(self, mac_n: str) -> list[str]:
+        """Build hostname_match seeds from the live UniFi client hostname only."""
         seeds: list[str] = []
         client = self.async_get_client_by_mac(mac_n) or self._clients_by_mac.get(mac_n)
         if client:
             host = str(client.get("hostname") or "").strip()
             if host:
                 seeds.append(host)
-        name = str(device_name or "").strip()
-        if name and name not in seeds and name != mac_n:
-            seeds.append(name)
         return seeds
 
     @staticmethod
@@ -638,7 +636,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             None,
         )
         device_id = existing["id"] if existing else f"dev-{mac_n.replace(':', '')}"
-        seeds = self._hostname_match_seeds(mac_n, device_name)
+        seeds = self._hostname_match_seeds(mac_n)
         if existing is None:
             devices.append(
                 {
@@ -718,15 +716,16 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._track_device_sync, mac, name, device_type
             )
             self._loader.reload()
-            self._rebuild_presence_state(list(self._all_clients))
-        await self.async_request_refresh()
+            data = self._rebuild_presence_state(list(self._all_clients))
+            self.async_set_updated_data(data)
         await self.async_sync_tracker_entities()
+        await self.async_request_refresh()
 
     def _track_device_sync(self, mac: str, name: str, device_type: str) -> None:
         mac_n = normalize_mac(mac)
         devices_data = self._read_devices_file()
         devices = list(devices_data.get("devices") or [])
-        seeds = self._hostname_match_seeds(mac_n, name)
+        seeds = self._hostname_match_seeds(mac_n)
         for device in devices:
             if normalize_mac(str(device.get("mac") or "")) == mac_n:
                 device["track"] = True
@@ -755,9 +754,10 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         async with self._config_lock:
             await self.hass.async_add_executor_job(self._remove_device_sync, mac)
             self._loader.reload()
-            self._rebuild_presence_state(list(self._all_clients))
-        await self.async_request_refresh()
+            data = self._rebuild_presence_state(list(self._all_clients))
+            self.async_set_updated_data(data)
         await self.async_sync_tracker_entities()
+        await self.async_request_refresh()
 
     @staticmethod
     def _detach_mac_from_person(person: dict[str, Any], mac_n: str) -> None:
