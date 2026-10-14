@@ -65,26 +65,42 @@ Die Integration speichert Konfiguration in JSON-Dateien unter `/config/unifi_peo
 **people.json** - Definiere Personen:
 ```json
 {
-  "sebastian": {
-    "name": "Sebastian",
-    "icon": "mdi:account",
-    "devices": {
-      "primary": ["AA:BB:CC:DD:EE:FF"],
-      "secondary": ["11:22:33:44:55:66", "77:88:99:AA:BB:CC"]
+  "version": 1,
+  "people": [
+    {
+      "id": "sebastian",
+      "name": "Sebastian",
+      "ha_person": "person.sebastian",
+      "device_ids": ["iphone-sebastian", "macbook-sebastian"]
     }
-  }
+  ]
 }
 ```
 
-**devices.json** - Verknüpfe Geräte mit Hostnamen (für private MACs):
+**devices.json** - Geräte mit MAC und optionalem Hostname-Match (exact/Substring, kein Regex):
 ```json
 {
-  "AA:BB:CC:DD:EE:FF": {
-    "name": "Sebastian iPhone",
-    "hostname_pattern": "sebastians?-iphone",
-    "type": "smartphone",
-    "manufacturer": "Apple"
-  }
+  "version": 1,
+  "devices": [
+    {
+      "id": "iphone-sebastian",
+      "name": "Sebastian iPhone",
+      "type": "smartphone",
+      "manufacturer_id": "apple",
+      "mac": "aa:bb:cc:dd:ee:ff",
+      "hostname_match": ["iPhone-Sebastian"],
+      "track": true
+    },
+    {
+      "id": "macbook-sebastian",
+      "name": "Sebastian MacBook",
+      "type": "laptop",
+      "manufacturer_id": "apple",
+      "mac": "11:22:33:44:55:66",
+      "hostname_match": ["MacBook-Sebastian"],
+      "track": true
+    }
+  ]
 }
 ```
 
@@ -199,26 +215,42 @@ The integration stores configuration in JSON files under `/config/unifi_people_p
 **people.json** - Define people:
 ```json
 {
-  "sebastian": {
-    "name": "Sebastian",
-    "icon": "mdi:account",
-    "devices": {
-      "primary": ["AA:BB:CC:DD:EE:FF"],
-      "secondary": ["11:22:33:44:55:66", "77:88:99:AA:BB:CC"]
+  "version": 1,
+  "people": [
+    {
+      "id": "sebastian",
+      "name": "Sebastian",
+      "ha_person": "person.sebastian",
+      "device_ids": ["iphone-sebastian", "macbook-sebastian"]
     }
-  }
+  ]
 }
 ```
 
-**devices.json** - Link devices with hostnames (for private MACs):
+**devices.json** - Devices with MAC and optional hostname match (exact/substring, not regex):
 ```json
 {
-  "AA:BB:CC:DD:EE:FF": {
-    "name": "Sebastian iPhone",
-    "hostname_pattern": "sebastians?-iphone",
-    "type": "smartphone",
-    "manufacturer": "Apple"
-  }
+  "version": 1,
+  "devices": [
+    {
+      "id": "iphone-sebastian",
+      "name": "Sebastian iPhone",
+      "type": "smartphone",
+      "manufacturer_id": "apple",
+      "mac": "aa:bb:cc:dd:ee:ff",
+      "hostname_match": ["iPhone-Sebastian"],
+      "track": true
+    },
+    {
+      "id": "macbook-sebastian",
+      "name": "Sebastian MacBook",
+      "type": "laptop",
+      "manufacturer_id": "apple",
+      "mac": "11:22:33:44:55:66",
+      "hostname_match": ["MacBook-Sebastian"],
+      "track": true
+    }
+  ]
 }
 ```
 

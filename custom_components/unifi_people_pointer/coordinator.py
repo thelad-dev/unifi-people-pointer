@@ -199,12 +199,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         if isinstance(payload, dict) and isinstance(
                             payload.get("data"), list
                         ):
-                            if payload["data"]:
-                                return payload["data"]
-                            _LOGGER.debug(
-                                "Classic sta returned empty data; trying integration API"
-                            )
-                        elif isinstance(payload, list) and payload:
+                            # Empty list is a valid live snapshot (all offline).
+                            return payload["data"]
+                        if isinstance(payload, list):
                             return payload
             except (PermissionError, asyncio.TimeoutError):
                 raise
