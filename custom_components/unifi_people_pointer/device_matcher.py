@@ -24,7 +24,10 @@ def match_device(
         for device in devices:
             patterns = device.get("hostname_match") or []
             for pattern in patterns:
-                if str(pattern).lower() == host_l:
+                token = str(pattern).strip().lower()
+                if not token:
+                    continue
+                if token == host_l:
                     return device
     return None
 
@@ -44,7 +47,10 @@ def match_device_partial(
     for device in devices:
         patterns = device.get("hostname_match") or []
         for pattern in patterns:
-            if str(pattern).lower() in host_l:
+            token = str(pattern).strip().lower()
+            if not token:
+                continue
+            if token in host_l:
                 return device
     return None
 

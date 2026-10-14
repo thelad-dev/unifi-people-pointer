@@ -38,7 +38,11 @@ def parse_clients(raw_data: list[dict[str, Any]] | None) -> list[dict[str, Any]]
     for entry in raw_data:
         if not isinstance(entry, dict):
             continue
-        mac_raw = entry.get("mac") or entry.get("mac_address")
+        mac_raw = (
+            entry.get("mac")
+            or entry.get("mac_address")
+            or entry.get("macAddress")
+        )
         if not mac_raw:
             continue
         mac = normalize_mac(str(mac_raw))
@@ -47,37 +51,65 @@ def parse_clients(raw_data: list[dict[str, Any]] | None) -> list[dict[str, Any]]
 
         hostname = entry.get("hostname")
         if hostname is None:
-            hostname = entry.get("name") or entry.get("oui") or ""
+            hostname = (
+                entry.get("name")
+                or entry.get("hostName")
+                or entry.get("oui")
+                or ""
+            )
 
         signal = entry.get("signal")
         if signal is None:
             signal = entry.get("rssi")
+        if signal is None:
+            signal = entry.get("signalStrength")
 
-        is_wired = bool(
-            entry.get("is_wired")
-            if entry.get("is_wired") is not None
-            else entry.get("wired", False)
-        )
+        if entry.get("is_wired") is not None:
+            is_wired = bool(entry.get("is_wired"))
+        elif entry.get("wired") is not None:
+            is_wired = bool(entry.get("wired"))
+        else:
+            client_type = str(entry.get("type") or entry.get("access") or "").upper()
+            if client_type in ("WIRED", "WIRE"):
+                is_wired = True
+            elif client_type in ("WIRELESS", "WIFI", "WLAN"):
+                is_wired = False
+            else:
+                is_wired = False
 
         last_seen = entry.get("last_seen")
         if last_seen is None:
             last_seen = entry.get("last_seen_epoch")
+        if last_seen is None:
+            last_seen = entry.get("lastSeen")
+
+        ap_raw = (
+            entry.get("ap_mac")
+            or entry.get("apMac")
+            or entry.get("uplinkDeviceId")
+            or entry.get("uplink_device_id")
+        )
+        ap_mac = normalize_mac(str(ap_raw)) if ap_raw else None
 
         clients.append(
             {
                 "mac": mac,
                 "hostname": hostname if hostname is not None else "",
-                "ip": entry.get("ip") or entry.get("ip_address"),
+                "ip": entry.get("ip")
+                or entry.get("ip_address")
+                or entry.get("ipAddress"),
                 "last_seen": last_seen,
                 "is_wired": is_wired,
-                "ap_mac": normalize_mac(str(entry["ap_mac"]))
-                if entry.get("ap_mac")
-                else entry.get("ap_mac"),
+                "ap_mac": ap_mac,
                 "signal": signal,
                 "signal_strength": signal,
                 "channel": entry.get("channel"),
-                "essid": entry.get("essid") or entry.get("ssid"),
-                "is_guest": bool(entry.get("is_guest", False)),
+                "essid": entry.get("essid")
+                or entry.get("ssid")
+                or entry.get("wlanNetworkName"),
+                "is_guest": bool(
+                    entry.get("is_guest", entry.get("isGuest", False))
+                ),
                 "raw": entry,
             }
         )

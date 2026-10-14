@@ -155,6 +155,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 unknown.append(client)
         now_unknown_macs = {c["mac"] for c in unknown if c.get("mac")}
 
+        # Keep last live MAC per online device so leave events match arrive.
+        for device_id in now_online_ids:
+            mac = self._mac_for_device_id(str(device_id))
+            if mac:
+                self._device_event_macs[str(device_id)] = mac
+
         # Fire debounced events after the first baseline poll.
         event_manager = self.hass.data.get(DOMAIN, {}).get("event_manager")
         if event_manager and self._events_primed:
@@ -169,7 +175,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     previous.get(person_id, {}).get("online_device_ids") or []
                 )
                 if source_ids:
-                    device_mac = self._mac_for_device_id(str(source_ids[0]))
+                    device_id = str(source_ids[0])
+                    device_mac = self._device_event_macs.get(
+                        device_id
+                    ) or self._mac_for_device_id(device_id)
+                    if device_mac:
+                        self._device_event_macs[device_id] = device_mac
                 if now_home:
                     event_manager.fire_person_arrived(
                         person=person_id, device=device_mac
