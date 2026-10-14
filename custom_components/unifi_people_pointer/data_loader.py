@@ -36,9 +36,22 @@ def load_devices(path: Path) -> dict[str, Any]:
     devices = data.get("devices", [])
     if not isinstance(devices, list):
         raise ValueError("devices must be a list")
+    valid: list[dict[str, Any]] = []
     for device in devices:
-        if isinstance(device, dict) and device.get("mac"):
+        if not isinstance(device, dict):
+            _LOGGER.warning("Ignoring non-object device entry in %s", path)
+            continue
+        if device.get("mac"):
             device["mac"] = normalize_mac(str(device["mac"]))
+        if not validate_device(device):
+            _LOGGER.warning(
+                "Ignoring invalid device entry in %s (need id + mac): %s",
+                path,
+                device.get("id") or device.get("mac") or device,
+            )
+            continue
+        valid.append(device)
+    data["devices"] = valid
     return data
 
 
@@ -50,6 +63,17 @@ def load_people(path: Path) -> dict[str, Any]:
     people = data.get("people", [])
     if not isinstance(people, list):
         raise ValueError("people must be a list")
+    valid: list[dict[str, Any]] = []
+    for person in people:
+        if not isinstance(person, dict) or not validate_person(person):
+            _LOGGER.warning(
+                "Ignoring invalid person entry in %s: %s",
+                path,
+                person if not isinstance(person, dict) else person.get("id") or person,
+            )
+            continue
+        valid.append(person)
+    data["people"] = valid
     return data
 
 

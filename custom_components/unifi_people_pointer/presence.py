@@ -20,14 +20,19 @@ def _online_device_ids(
     clients: list[dict[str, Any]],
 ) -> set[str]:
     """Return configured device ids that match an online client and are tracked."""
+    tracked = [
+        d
+        for d in devices
+        if isinstance(d, dict) and d.get("id") and is_tracked(d)
+    ]
     online: set[str] = set()
     for client in clients:
-        device = match_device(client, devices) or match_device_partial(client, devices)
+        device = match_device(client, tracked) or match_device_partial(client, tracked)
         if device is None:
             continue
-        if not is_tracked(device):
-            continue
-        online.add(device["id"])
+        device_id = device.get("id")
+        if device_id:
+            online.add(device_id)
     return online
 
 
@@ -52,10 +57,13 @@ def determine_presence(
         if not device_ids and person.get("primary_device"):
             macs = [person["primary_device"], *person.get("secondary_devices", [])]
             for device in devices:
+                device_id = device.get("id") if isinstance(device, dict) else None
+                if not device_id:
+                    continue
                 if normalize_mac(str(device.get("mac") or "")) in {
                     normalize_mac(str(m)) for m in macs
                 }:
-                    device_ids.append(device["id"])
+                    device_ids.append(device_id)
 
         online_for_person = [d for d in device_ids if d in online_ids]
         is_home = len(online_for_person) > 0

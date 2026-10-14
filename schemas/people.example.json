@@ -1,22 +1,20 @@
 {
+  "version": 1,
+  "notes": ["Example people mapped via device_ids to devices.json entries"],
   "people": [
     {
       "id": "sebastian",
       "name": "Sebastian",
-      "primary_device": "AA:BB:CC:DD:EE:FF",
-      "secondary_devices": [
-        "11:22:33:44:55:66",
-        "77:88:99:AA:BB:CC"
-      ],
-      "enabled": true,
-      "mobile_app_entity": "device_tracker.sebastian_iphone"
+      "ha_person": "person.sebastian",
+      "device_ids": ["iphone-sebastian", "macbook-sebastian"],
+      "notes": null
     },
     {
       "id": "example_person",
       "name": "Example Person",
-      "primary_device": "DD:EE:FF:00:11:22",
-      "secondary_devices": [],
-      "enabled": true
+      "ha_person": "person.example_person",
+      "device_ids": ["iphone-sebastian"],
+      "notes": null
     }
   ]
 }
