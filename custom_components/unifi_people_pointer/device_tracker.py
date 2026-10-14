@@ -14,8 +14,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .api_parser import normalize_mac
 from .const import DOMAIN
 from .coordinator import UniFiPeoplePointerCoordinator
+from .presence import person_owns_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,40 +28,99 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up UniFi People Pointer device tracker from config entry."""
-    # Coordinator is registered at setup; entity creation lands in Phase 3.
-    _ = hass.data[DOMAIN][entry.entry_id]
+    runtime = hass.data[DOMAIN][entry.entry_id]
+    coordinator: UniFiPeoplePointerCoordinator = runtime["coordinator"]
 
-    # TODO: Load people and devices from JSON files
-    # For now, create empty lists
     entities: list[TrackerEntity] = []
+    devices_by_id = {d["id"]: d for d in coordinator.devices if d.get("id")}
 
-    # Example: Create a person tracker (will be populated from people.json later)
-    # person_data = {
-    #     "id": "example_person",
-    #     "name": "Example Person",
-    #     "primary_device": "AA:BB:CC:DD:EE:FF",
-    #     "secondary_devices": [],
-    # }
-    # entities.append(UniFiPersonTracker(coordinator, person_data))
+    for person in coordinator.people:
+        person_id = person.get("id")
+        if not person_id:
+            continue
+        device_ids = list(person.get("device_ids") or [])
+        primary_mac = ""
+        secondary_macs: list[str] = []
+        if device_ids:
+            primary = devices_by_id.get(device_ids[0])
+            if primary:
+                primary_mac = normalize_mac(str(primary.get("mac") or ""))
+            for device_id in device_ids[1:]:
+                device = devices_by_id.get(device_id)
+                if device and device.get("mac"):
+                    secondary_macs.append(normalize_mac(str(device["mac"])))
+        elif person.get("primary_device"):
+            primary_mac = normalize_mac(str(person["primary_device"]))
+            secondary_macs = [
+                normalize_mac(str(m)) for m in person.get("secondary_devices") or []
+            ]
 
-    # Example: Create a device tracker (will be populated from devices.json later)
-    # device_data = {
-    #     "mac": "AA:BB:CC:DD:EE:FF",
-    #     "name": "Example Device",
-    # }
-    # entities.append(UniFiDeviceTracker(coordinator, device_data))
+        person_data = {
+            "id": person_id,
+            "name": person.get("name") or person_id,
+            "primary_device": primary_mac,
+            "secondary_devices": secondary_macs,
+            "ha_person": person.get("ha_person"),
+            "device_ids": device_ids,
+        }
+        entities.append(UniFiPersonTracker(coordinator, person_data))
+
+    for device in coordinator.devices:
+        device_id = device.get("id")
+        mac = normalize_mac(str(device.get("mac") or ""))
+        if not device_id and not mac:
+            continue
+        person_id = None
+        for person in coordinator.people:
+            if person_owns_device(
+                person,
+                device_id=device_id,
+                device_mac=mac,
+                devices=coordinator.devices,
+            ):
+                person_id = person.get("id")
+                break
+        entities.append(
+            UniFiDeviceTracker(
+                coordinator,
+                {
+                    "id": device_id,
+                    "mac": mac,
+                    "name": device.get("name") or device_id or mac,
+                    "type": device.get("type"),
+                    "person": person_id,
+                },
+            )
+        )
+
+    known_people = {
+        str(p.get("id")) for p in coordinator.people if p.get("id") is not None
+    }
+    known_devices = {
+        str(d.get("id"))
+        for d in coordinator.devices
+        if isinstance(d, dict) and d.get("id") is not None
+    }
+    coordinator.register_tracker_platform(
+        async_add_entities, known_people, known_devices
+    )
 
     if entities:
         async_add_entities(entities)
         _LOGGER.info("Added %d device tracker entities", len(entities))
     else:
-        _LOGGER.info(
-            "No device trackers to add (people.json/devices.json not yet created)"
+        _LOGGER.warning(
+            "No device trackers to add - create %s/people.json and devices.json",
+            DOMAIN,
         )
 
 
-class UniFiPersonTracker(CoordinatorEntity, TrackerEntity):
+class UniFiPersonTracker(
+    CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity
+):
     """Representation of a UniFi Person Tracker."""
+
+    _attr_has_entity_name = False
 
     def __init__(
         self,
@@ -69,24 +130,9 @@ class UniFiPersonTracker(CoordinatorEntity, TrackerEntity):
         """Initialize the person tracker."""
         super().__init__(coordinator)
         self._person_id = person_data["id"]
-        self._name = person_data["name"]
-        self._primary_device = person_data["primary_device"]
-        self._secondary_devices = person_data.get("secondary_devices", [])
-        self._state = STATE_NOT_HOME
-        self._current_zone: str | None = None
-        self._last_location: str | None = None
-        self._fallback_source: str = "unifi"
-        self._grace_period_start: datetime | None = None
-
-    @property
-    def unique_id(self) -> str:
-        """Return unique ID."""
-        return f"{DOMAIN}_person_{self._person_id}"
-
-    @property
-    def name(self) -> str:
-        """Return the name."""
-        return self._name
+        self._attr_name = person_data["name"]
+        self._ha_person = person_data.get("ha_person")
+        self._attr_unique_id = f"{DOMAIN}_person_{self._person_id}"
 
     @property
     def source_type(self) -> SourceType:
@@ -94,59 +140,104 @@ class UniFiPersonTracker(CoordinatorEntity, TrackerEntity):
         return SourceType.ROUTER
 
     @property
+    def latitude(self) -> float | None:
+        """Return latitude (not used for router source)."""
+        return None
+
+    @property
+    def longitude(self) -> float | None:
+        """Return longitude (not used for router source)."""
+        return None
+
+    @property
+    def location_name(self) -> str:
+        """Return home/not_home from presence."""
+        state = self.coordinator.get_person_state(self._person_id)
+        return STATE_HOME if state == "home" else STATE_NOT_HOME
+
+    @property
     def state(self) -> str:
         """Return the state."""
-        return self._state
+        return self.location_name
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return state attributes."""
+        presence = self.coordinator.get_person_presence(self._person_id) or {}
+        primary, secondary = self._current_device_macs(presence)
         return {
-            "primary_device": self._get_primary_device_info(),
-            "secondary_devices": self._get_secondary_devices_info(),
-            "current_zone": self._current_zone,
-            "last_location": self._last_location,
-            "fallback_source": self._fallback_source,
+            "person_id": self._person_id,
+            "ha_person": self._ha_person,
+            "primary_device": {
+                "mac": primary,
+                "connected": bool(primary)
+                and self.coordinator.is_device_online(primary),
+            },
+            "secondary_devices": [
+                {
+                    "mac": mac,
+                    "connected": self.coordinator.is_device_online(mac),
+                }
+                for mac in secondary
+            ],
+            "devices_online": presence.get("devices_online", 0),
+            "online_device_ids": presence.get("online_device_ids", []),
+            "source": "unifi_people_pointer",
         }
 
-    def _get_primary_device_info(self) -> dict[str, Any]:
-        """Get primary device info."""
-        # TODO: Get actual device info from coordinator
-        return {
-            "mac": self._primary_device,
-            "connected": self.coordinator.is_device_online(self._primary_device),
-        }
+    def _current_device_macs(self, presence: dict[str, Any]) -> tuple[str, list[str]]:
+        """Resolve primary/secondary MACs from live coordinator config."""
+        devices = list(presence.get("devices") or [])
+        if not devices:
+            person_devices = self.coordinator.get_person_devices(self._person_id)
+            primary_dev = person_devices.get("primary")
+            secondary_devs = list(person_devices.get("secondary") or [])
+            devices = ([primary_dev] if primary_dev else []) + secondary_devs
 
-    def _get_secondary_devices_info(self) -> list[dict[str, Any]]:
-        """Get secondary devices info."""
-        # TODO: Get actual device info from coordinator
-        return [
-            {
-                "mac": mac,
-                "connected": self.coordinator.is_device_online(mac),
+        macs: list[str] = []
+        for device in devices:
+            if not isinstance(device, dict):
+                continue
+            mac = normalize_mac(str(device.get("mac") or ""))
+            if mac:
+                macs.append(mac)
+
+        if not macs:
+            # Fallback: people.json device_ids against current devices list.
+            person = next(
+                (p for p in self.coordinator.people if p.get("id") == self._person_id),
+                None,
+            )
+            device_ids = list((person or {}).get("device_ids") or [])
+            by_id = {
+                d.get("id"): d
+                for d in self.coordinator.devices
+                if isinstance(d, dict) and d.get("id")
             }
-            for mac in self._secondary_devices
-        ]
+            for device_id in device_ids:
+                device = by_id.get(device_id)
+                if not device:
+                    continue
+                mac = normalize_mac(str(device.get("mac") or ""))
+                if mac:
+                    macs.append(mac)
+
+        primary = macs[0] if macs else ""
+        secondary = macs[1:] if len(macs) > 1 else []
+        return primary, secondary
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        # Check if primary device is online
-        primary_online = self.coordinator.is_device_online(self._primary_device)
-
-        if primary_online:
-            self._state = STATE_HOME
-            self._fallback_source = "unifi"
-            self._grace_period_start = None
-        else:
-            # TODO: Implement grace period and fallback logic
-            self._state = STATE_NOT_HOME
-
         self.async_write_ha_state()
 
 
-class UniFiDeviceTracker(CoordinatorEntity, TrackerEntity):
+class UniFiDeviceTracker(
+    CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity
+):
     """Representation of a UniFi Device Tracker."""
+
+    _attr_has_entity_name = False
 
     def __init__(
         self,
@@ -155,27 +246,51 @@ class UniFiDeviceTracker(CoordinatorEntity, TrackerEntity):
     ) -> None:
         """Initialize the device tracker."""
         super().__init__(coordinator)
-        self._mac = device_data["mac"]
-        self._name = device_data["name"]
-        self._ip: str | None = None
-        self._hostname: str | None = None
-        self._manufacturer: str | None = None
-        self._signal_strength: int | None = None
-        self._ap_name: str | None = None
-        self._ap_mac: str | None = None
-        self._last_seen: datetime | None = None
-        self._person: str | None = device_data.get("person")
-        self._device_type: str | None = device_data.get("type")
+        self._device_id = device_data.get("id")
+        self._setup_mac = normalize_mac(str(device_data.get("mac") or ""))
+        self._attr_name = device_data["name"]
+        uid_key = (
+            str(self._device_id)
+            if self._device_id
+            else self._setup_mac.replace(":", "").lower()
+        )
+        self._attr_unique_id = f"{DOMAIN}_device_{uid_key}"
 
-    @property
-    def unique_id(self) -> str:
-        """Return unique ID."""
-        return f"{DOMAIN}_device_{self._mac.replace(':', '').lower()}"
+    def _current_device(self) -> dict[str, Any] | None:
+        """Return the live devices.json record for this tracker."""
+        if self._device_id:
+            for device in self.coordinator.devices:
+                if isinstance(device, dict) and device.get("id") == self._device_id:
+                    return device
+        if self._setup_mac:
+            for device in self.coordinator.devices:
+                if not isinstance(device, dict):
+                    continue
+                if normalize_mac(str(device.get("mac") or "")) == self._setup_mac:
+                    return device
+        return None
 
-    @property
-    def name(self) -> str:
-        """Return the name."""
-        return self._name
+    def _current_mac(self) -> str:
+        """Configured MAC from the latest devices.json entry."""
+        device = self._current_device()
+        if device and device.get("mac"):
+            return normalize_mac(str(device["mac"]))
+        return self._setup_mac
+
+    def _current_person(self) -> str | None:
+        """Person id currently assigned to this device."""
+        device = self._current_device()
+        device_id = (device or {}).get("id") or self._device_id
+        mac = self._current_mac()
+        for person in self.coordinator.people:
+            if person_owns_device(
+                person,
+                device_id=device_id,
+                device_mac=mac,
+                devices=self.coordinator.devices,
+            ):
+                return person.get("id")
+        return None
 
     @property
     def source_type(self) -> SourceType:
@@ -183,44 +298,69 @@ class UniFiDeviceTracker(CoordinatorEntity, TrackerEntity):
         return SourceType.ROUTER
 
     @property
+    def latitude(self) -> float | None:
+        """Return latitude."""
+        return None
+
+    @property
+    def longitude(self) -> float | None:
+        """Return longitude."""
+        return None
+
+    @property
+    def location_name(self) -> str:
+        """Return home/not_home for the device."""
+        return STATE_HOME if self._is_connected() else STATE_NOT_HOME
+
+    @property
     def state(self) -> str:
         """Return the state."""
-        return STATE_HOME if self._is_connected() else STATE_NOT_HOME
+        return self.location_name
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return state attributes."""
+        mac = self._current_mac()
+        device = self._current_device() or {}
+        client = self.coordinator.async_get_client_by_mac(mac) or {}
+        last_seen = client.get("last_seen")
+        last_seen_iso = None
+        if isinstance(last_seen, (int, float)):
+            try:
+                last_seen_iso = datetime.fromtimestamp(int(last_seen)).isoformat()
+            except (OverflowError, OSError, ValueError):
+                last_seen_iso = str(last_seen)
+        elif last_seen is not None:
+            last_seen_iso = str(last_seen)
         return {
-            "mac": self._mac,
-            "ip": self._ip,
-            "hostname": self._hostname,
-            "manufacturer": self._manufacturer,
-            "signal_strength": self._signal_strength,
-            "ap_name": self._ap_name,
-            "ap_mac": self._ap_mac,
-            "last_seen": self._last_seen.isoformat() if self._last_seen else None,
-            "person": self._person,
-            "device_type": self._device_type,
+            "mac": mac,
+            "device_id": device.get("id") or self._device_id,
+            "ip": client.get("ip"),
+            "hostname": client.get("hostname"),
+            "signal_strength": client.get("signal") or client.get("signal_strength"),
+            "ap_mac": client.get("ap_mac"),
+            "last_seen": last_seen_iso,
+            "person": self._current_person(),
+            "device_type": device.get("type"),
+            "source": "unifi_people_pointer",
         }
 
     def _is_connected(self) -> bool:
-        """Check if device is connected."""
-        return self.coordinator.is_device_online(self._mac)
+        """Check if device is connected using the current configured MAC."""
+        device = self._current_device()
+        if device is None:
+            return False
+        mac = normalize_mac(str(device.get("mac") or "")) or self._current_mac()
+        if mac and self.coordinator.is_device_online(mac):
+            return True
+        device_id = device.get("id")
+        if device_id and device_id in getattr(
+            self.coordinator, "_online_device_ids_cache", set()
+        ):
+            return True
+        return False
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        # Get device info from coordinator
-        client = self.hass.loop.run_in_executor(
-            None, self.coordinator.async_get_client_by_mac, self._mac
-        )
-
-        if client:
-            self._ip = client.get("ip")
-            self._hostname = client.get("hostname")
-            self._signal_strength = client.get("signal_strength")
-            self._ap_name = client.get("ap_name")
-            self._ap_mac = client.get("ap_mac")
-            self._last_seen = datetime.now()
-
         self.async_write_ha_state()

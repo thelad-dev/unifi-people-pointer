@@ -4,9 +4,6 @@ from datetime import datetime, timedelta
 
 import pytest
 
-# Parser helpers are still Phase 3 stubs (raise NotImplementedError).
-pytestmark = pytest.mark.skip(reason="Requires Phase 3 api_parser implementation")
-
 
 @pytest.mark.unit
 class TestAPIParser:

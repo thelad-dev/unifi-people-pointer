@@ -1,18 +1,26 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "description": "Device registry for UniFi People Pointer",
+  "description": "Device registry for UniFi People Pointer (docs/datenmodell.md)",
   "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Schema version"
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
     "devices": {
       "type": "array",
       "description": "List of registered devices",
       "items": {
         "type": "object",
         "properties": {
-          "mac": {
+          "id": {
             "type": "string",
-            "description": "MAC Address (unique identifier)",
-            "pattern": "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+            "description": "Stable device key referenced from people.device_ids",
+            "minLength": 1
           },
           "name": {
             "type": "string",
@@ -22,28 +30,48 @@
           "type": {
             "type": "string",
             "description": "Device type",
-            "enum": ["smartphone", "laptop", "tablet", "desktop", "iot", "other"]
+            "enum": [
+              "smartphone",
+              "laptop",
+              "tablet",
+              "desktop",
+              "wearable",
+              "iot",
+              "other"
+            ]
           },
-          "manufacturer": {
-            "type": "string",
-            "description": "Device manufacturer (from OUI or custom)"
+          "manufacturer_id": {
+            "type": ["string", "null"],
+            "description": "Reference to manufacturers.json id"
           },
-          "model": {
+          "mac": {
             "type": "string",
-            "description": "Device model"
+            "description": "WLAN MAC address",
+            "pattern": "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+          },
+          "hostname_match": {
+            "type": "array",
+            "description": "Exact or substring hostname tokens (not regex)",
+            "items": { "type": "string", "minLength": 1 },
+            "default": []
+          },
+          "track": {
+            "type": "boolean",
+            "description": "Include device in presence matching",
+            "default": true
           },
           "disabled": {
             "type": "boolean",
-            "description": "Disable tracking for this device",
+            "description": "Disable this device",
             "default": false
           },
           "notes": {
-            "type": "string",
+            "type": ["string", "null"],
             "description": "User notes"
           }
         },
-        "required": ["mac", "name"],
-        "additionalProperties": false
+        "required": ["id", "mac"],
+        "additionalProperties": true
       }
     }
   },

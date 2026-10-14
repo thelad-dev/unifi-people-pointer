@@ -2,9 +2,6 @@
 
 import pytest
 
-# Device matcher helpers are still Phase 3 stubs (raise NotImplementedError).
-pytestmark = pytest.mark.skip(reason="Requires Phase 3 device_matcher implementation")
-
 
 @pytest.mark.unit
 class TestDeviceMatcher:
@@ -177,3 +174,96 @@ class TestDeviceMatcher:
         )
 
         assert manufacturer is None
+
+    def test_friendly_name_exact_match_only(self):
+        """Display name is exact identity only when hostname_match is empty."""
+        from custom_components.unifi_people_pointer.device_matcher import (
+            match_device,
+            match_device_partial,
+        )
+
+        devices = [
+            {
+                "id": "amy-phone",
+                "name": "iPhone",
+                "mac": "aa:bb:cc:dd:ee:01",
+                "hostname_match": [],
+                "track": True,
+            },
+            {
+                "id": "tom-phone",
+                "name": "Christoph Phone",
+                "mac": "aa:bb:cc:dd:ee:02",
+                "hostname_match": ["iPhone-RB"],
+                "track": True,
+            },
+        ]
+
+        exact = match_device(
+            {"mac": "11:22:33:44:55:66", "hostname": "iPhone"}, devices
+        )
+        assert exact is not None
+        assert exact["id"] == "amy-phone"
+
+        # Substring of another phone's hostname must not claim via friendly name.
+        partial = match_device_partial(
+            {"mac": "11:22:33:44:55:66", "hostname": "iPhone-RB"}, devices
+        )
+        assert partial is not None
+        assert partial["id"] == "tom-phone"
+
+    def test_name_tier_skips_devices_with_hostname_match(self):
+        """Name equality must not dual-home when peer uses empty hostname_match."""
+        from custom_components.unifi_people_pointer.device_matcher import (
+            exact_matching_devices,
+        )
+        from custom_components.unifi_people_pointer.presence import _online_device_ids
+
+        devices = [
+            {
+                "id": "tom",
+                "name": "Pixel-6",
+                "mac": "aa:bb:cc:dd:ee:10",
+                "hostname_match": [],
+                "track": True,
+            },
+            {
+                "id": "amy",
+                "name": "Pixel-6",
+                "mac": "aa:bb:cc:dd:ee:11",
+                "hostname_match": ["iPhone-AN"],
+                "track": True,
+            },
+        ]
+        client = {"mac": "11:22:33:44:55:66", "hostname": "Pixel-6"}
+        hits = exact_matching_devices(client, devices)
+        assert [d["id"] for d in hits] == ["tom"]
+        assert _online_device_ids(devices, [client]) == {"tom"}
+
+    def test_name_exact_yields_to_peer_hostname_match(self):
+        """hostname_match identity beats a peer display-name equality."""
+        from custom_components.unifi_people_pointer.device_matcher import (
+            exact_matching_devices,
+            match_device,
+        )
+
+        devices = [
+            {
+                "id": "tom-phone",
+                "name": "Christoph Phone",
+                "mac": "aa:bb:cc:dd:ee:02",
+                "hostname_match": ["iPhone-RB"],
+                "track": True,
+            },
+            {
+                "id": "amy-phone",
+                "name": "iPhone-RB",
+                "mac": "aa:bb:cc:dd:ee:01",
+                "hostname_match": ["iPhone-AN"],
+                "track": True,
+            },
+        ]
+        client = {"mac": "11:22:33:44:55:66", "hostname": "iPhone-RB"}
+        hits = exact_matching_devices(client, devices)
+        assert [d["id"] for d in hits] == ["tom-phone"]
+        assert match_device(client, devices)["id"] == "tom-phone"

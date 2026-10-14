@@ -1,21 +1,36 @@
 {
-  "AA:BB:CC:DD:EE:FF": {
-    "name": "Christoph iPhone",
-    "hostname_pattern": "christophs?-iphone",
-    "type": "smartphone",
-    "manufacturer": "Apple",
-    "notes": "Primary phone with private MAC"
-  },
-  "11:22:33:44:55:66": {
-    "name": "Christoph MacBook",
-    "hostname_pattern": "christophs?-macbook",
-    "type": "laptop",
-    "manufacturer": "Apple"
-  },
-  "12:34:56:78:90:AB": {
-    "name": "Maria Android",
-    "hostname_pattern": "maria-.*",
-    "type": "smartphone",
-    "manufacturer": "Samsung"
-  }
+  "version": 1,
+  "notes": ["Example devices; hostname_match is exact or substring, not regex"],
+  "devices": [
+    {
+      "id": "iphone-christoph",
+      "name": "Christoph iPhone",
+      "type": "smartphone",
+      "manufacturer_id": "apple",
+      "mac": "aa:bb:cc:dd:ee:ff",
+      "hostname_match": ["iPhone-Christoph"],
+      "track": true,
+      "notes": "Primary phone with private MAC"
+    },
+    {
+      "id": "macbook-christoph",
+      "name": "Christoph MacBook",
+      "type": "laptop",
+      "manufacturer_id": "apple",
+      "mac": "11:22:33:44:55:66",
+      "hostname_match": ["MacBook-Christoph"],
+      "track": true,
+      "notes": null
+    },
+    {
+      "id": "android-maria",
+      "name": "Maria Android",
+      "type": "smartphone",
+      "manufacturer_id": "samsung",
+      "mac": "12:34:56:78:90:ab",
+      "hostname_match": ["maria"],
+      "track": true,
+      "notes": "Substring match; prefer exact hostnames when too coarse"
+    }
+  ]
 }

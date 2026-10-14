@@ -8,43 +8,83 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import DEFAULT_EVENT_DEBOUNCE, DOMAIN
+from .coordinator import UniFiPeoplePointerCoordinator
+from .events import UniFiEventManager
+from .services import setup_services, unregister_services
 
 _LOGGER = logging.getLogger(__name__)
 
-# Platforms stay disabled until coordinator + entity wiring is ready.
-# Forwarding too early crashes setup (missing coordinator / stub entities).
-PLATFORMS: list[Platform] = []
+PLATFORMS: list[Platform] = [Platform.DEVICE_TRACKER, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up UniFi People Pointer from a config entry.
-
-    Stores entry runtime data so services/helpers can resolve the integration.
-    Platforms are not forwarded yet (Phase 3).
-    """
+    """Set up UniFi People Pointer from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+
+    coordinator = UniFiPeoplePointerCoordinator(hass, entry)
+    await coordinator.async_config_entry_first_refresh()
+
+    debounce = int(entry.options.get("event_debounce", DEFAULT_EVENT_DEBOUNCE))
+    event_manager = UniFiEventManager(hass, debounce_seconds=debounce)
+
     hass.data[DOMAIN][entry.entry_id] = {
         "entry": entry,
-        "coordinator": None,
+        "coordinator": coordinator,
     }
+    # Services resolve the active coordinator here.
+    hass.data[DOMAIN]["coordinator"] = coordinator
+    hass.data[DOMAIN]["event_manager"] = event_manager
+
+    if "services_registered" not in hass.data[DOMAIN]:
+        setup_services(hass)
+        hass.data[DOMAIN]["services_registered"] = True
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+
     _LOGGER.info(
-        "UniFi People Pointer configured for host %s (platforms deferred)",
+        "UniFi People Pointer ready for host %s (%d people, %d devices)",
         entry.data.get("host"),
+        len(coordinator.people),
+        len(coordinator.devices),
     )
     return True
 
 
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Handle options update."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if PLATFORMS:
-        unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    else:
-        unload_ok = True
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
-        if DOMAIN in hass.data and not hass.data[DOMAIN]:
-            hass.data.pop(DOMAIN)
+        # Drop shared pointers when no entries remain.
+        shared_keys = (
+            "coordinator",
+            "event_manager",
+            "services_registered",
+            "unknown_first_seen",
+            "unknown_dismissed",
+        )
+        remaining = [key for key in hass.data.get(DOMAIN, {}) if key not in shared_keys]
+        if not remaining:
+            event_manager = hass.data.get(DOMAIN, {}).get("event_manager")
+            if event_manager is not None:
+                event_manager.cancel_all()
+            if hass.data.get(DOMAIN, {}).get("services_registered"):
+                unregister_services(hass)
+            # Keep unknown client bookkeeping across config-entry reload.
+            first_seen = hass.data.get(DOMAIN, {}).get("unknown_first_seen") or {}
+            dismissed = hass.data.get(DOMAIN, {}).get("unknown_dismissed") or {}
+            hass.data[DOMAIN] = {
+                "unknown_first_seen": first_seen,
+                "unknown_dismissed": dismissed,
+            }
 
     return unload_ok
