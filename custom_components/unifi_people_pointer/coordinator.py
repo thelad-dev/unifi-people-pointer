@@ -97,6 +97,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._prev_online_device_ids: set[str] = set()
         self._prev_unknown_macs: set[str] = set()
         self._events_primed: bool = False
+        self._config_lock = asyncio.Lock()
         self.last_exception = ""
 
     @property
@@ -486,10 +487,11 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         device_name: str | None = None,
     ) -> None:
         """Assign a device MAC to a person (persisted in JSON)."""
-        await self.hass.async_add_executor_job(
-            self._assign_device_sync, mac, person, device_type, device_name
-        )
-        await self.async_request_refresh()
+        async with self._config_lock:
+            await self.hass.async_add_executor_job(
+                self._assign_device_sync, mac, person, device_type, device_name
+            )
+            await self.async_request_refresh()
 
     def _hostname_match_seeds(
         self, mac_n: str, device_name: str | None
@@ -578,6 +580,15 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             other_ids = list(other.get("device_ids") or [])
             if device_id in other_ids:
                 other["device_ids"] = [i for i in other_ids if i != device_id]
+            if normalize_mac(str(other.get("primary_device") or "")) == mac_n:
+                other["primary_device"] = None
+            secondaries = other.get("secondary_devices")
+            if isinstance(secondaries, list):
+                other["secondary_devices"] = [
+                    m
+                    for m in secondaries
+                    if normalize_mac(str(m or "")) != mac_n
+                ]
         ids = [i for i in (target.get("device_ids") or []) if i != device_id]
         if device_type == "primary":
             ids.insert(0, device_id)
@@ -591,10 +602,11 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, mac: str, name: str, device_type: str = "other"
     ) -> None:
         """Start tracking a device."""
-        await self.hass.async_add_executor_job(
-            self._track_device_sync, mac, name, device_type
-        )
-        await self.async_request_refresh()
+        async with self._config_lock:
+            await self.hass.async_add_executor_job(
+                self._track_device_sync, mac, name, device_type
+            )
+            await self.async_request_refresh()
 
     def _track_device_sync(self, mac: str, name: str, device_type: str) -> None:
         mac_n = normalize_mac(mac)
@@ -628,8 +640,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def remove_device(self, mac: str) -> None:
         """Stop tracking / remove a device."""
-        await self.hass.async_add_executor_job(self._remove_device_sync, mac)
-        await self.async_request_refresh()
+        async with self._config_lock:
+            await self.hass.async_add_executor_job(self._remove_device_sync, mac)
+            await self.async_request_refresh()
 
     def _remove_device_sync(self, mac: str) -> None:
         mac_n = normalize_mac(mac)
