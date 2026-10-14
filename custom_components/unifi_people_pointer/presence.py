@@ -31,10 +31,14 @@ def person_owns_device(
     person: dict[str, Any],
     device_id: str | None = None,
     device_mac: str | None = None,
+    devices: list[dict[str, Any]] | None = None,
 ) -> bool:
     """True if person owns device via device_ids or primary/secondary MAC."""
     if device_id and device_id in (person.get("device_ids") or []):
         return True
+    if device_id and devices is not None:
+        if device_id in _device_ids_for_person(person, devices):
+            return True
     mac_n = normalize_mac(str(device_mac or ""))
     if not mac_n:
         return False

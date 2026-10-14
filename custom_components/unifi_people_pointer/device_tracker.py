@@ -72,7 +72,12 @@ async def async_setup_entry(
             continue
         person_id = None
         for person in coordinator.people:
-            if person_owns_device(person, device_id=device_id, device_mac=mac):
+            if person_owns_device(
+                person,
+                device_id=device_id,
+                device_mac=mac,
+                devices=coordinator.devices,
+            ):
                 person_id = person.get("id")
                 break
         entities.append(
@@ -278,7 +283,12 @@ class UniFiDeviceTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
         device_id = (device or {}).get("id") or self._device_id
         mac = self._current_mac()
         for person in self.coordinator.people:
-            if person_owns_device(person, device_id=device_id, device_mac=mac):
+            if person_owns_device(
+                person,
+                device_id=device_id,
+                device_mac=mac,
+                devices=self.coordinator.devices,
+            ):
                 return person.get("id")
         return None
 

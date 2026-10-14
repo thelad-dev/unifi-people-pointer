@@ -212,9 +212,13 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         mac = str(device_id)
                     self._device_event_macs[str(device_id)] = mac
                 person_id = None
+                configured_mac = normalize_mac(str(device.get("mac") or ""))
                 for person in self.people:
                     if person_owns_device(
-                        person, device_id=str(device_id), device_mac=mac
+                        person,
+                        device_id=str(device_id),
+                        device_mac=configured_mac or mac,
+                        devices=self.devices,
                     ):
                         person_id = person.get("id")
                         break
@@ -261,6 +265,8 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._events_primed = True
 
         guests = [c for c in wireless if c.get("is_guest")]
+
+        await self.async_sync_tracker_entities()
 
         return {
             "clients": all_clients,
@@ -770,7 +776,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 continue
             person_id = None
             for person in self.people:
-                if person_owns_device(person, device_id=device_id, device_mac=mac):
+                if person_owns_device(
+                    person,
+                    device_id=device_id,
+                    device_mac=mac,
+                    devices=self.devices,
+                ):
                     person_id = person.get("id")
                     break
             new_entities.append(
