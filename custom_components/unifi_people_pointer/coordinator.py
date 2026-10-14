@@ -114,23 +114,14 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Reload people/devices JSON from disk."""
         self._loader.reload()
 
-    async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch clients from UniFi and compute presence."""
-        # Pick up people/devices.json edits without a full reload.
-        async with self._config_lock:
-            await self.hass.async_add_executor_job(self._loader.reload)
-
-        try:
-            raw_clients = await self._fetch_clients()
-        except Exception as err:  # noqa: BLE001
-            self.last_exception = str(err)
-            raise UpdateFailed(f"UniFi client fetch failed: {err}") from err
-
-        clients = deduplicate_clients(parse_clients(raw_clients))
-        wireless = filter_wireless_only(clients)
-        # Keep wired too for matching, but presence mainly cares about wireless phones.
-        all_clients = clients
-
+    def _rebuild_presence_state(
+        self,
+        all_clients: list[dict[str, Any]],
+        *,
+        fire_events: bool,
+    ) -> dict[str, Any]:
+        """Recompute presence indexes from config + client snapshot."""
+        wireless = filter_wireless_only(all_clients)
         self._all_clients = all_clients
         self._clients_by_mac = {
             c["mac"]: c for c in all_clients if c.get("mac")
@@ -170,9 +161,8 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if mac:
                 self._device_event_macs[key] = mac
 
-        # Fire debounced events after the first baseline poll.
         event_manager = self.hass.data.get(DOMAIN, {}).get("event_manager")
-        if event_manager and self._events_primed:
+        if fire_events and event_manager and self._events_primed:
             for person_id, row in self._presence_by_person.items():
                 was = previous.get(person_id, {}).get("is_home")
                 now_home = row.get("is_home")
@@ -262,12 +252,10 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self._prev_online_device_ids = now_online_ids
         self._prev_unknown_macs = now_unknown_macs
-        self._events_primed = True
+        if fire_events:
+            self._events_primed = True
 
         guests = [c for c in wireless if c.get("is_guest")]
-
-        await self.async_sync_tracker_entities()
-
         return {
             "clients": all_clients,
             "wireless": wireless,
@@ -275,6 +263,39 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "unknown_clients": unknown,
             "guest_clients": guests,
         }
+
+    async def _async_update_data(self) -> dict[str, Any]:
+        """Fetch clients from UniFi and compute presence."""
+        # Pick up people/devices.json edits without a full reload.
+        async with self._config_lock:
+            await self.hass.async_add_executor_job(self._loader.reload)
+
+        fetch_error: Exception | None = None
+        try:
+            raw_clients = await self._fetch_clients()
+        except Exception as err:  # noqa: BLE001
+            fetch_error = err
+            self.last_exception = str(err)
+            raw_clients = None
+
+        if raw_clients is not None:
+            all_clients = deduplicate_clients(parse_clients(raw_clients))
+            data = self._rebuild_presence_state(all_clients, fire_events=True)
+            await self.async_sync_tracker_entities()
+            return data
+
+        # Config already reloaded; recompute from last-good clients so ownership
+        # changes apply even when UniFi is temporarily unreachable.
+        if self._all_clients or self._clients_by_mac or self._presence_by_person:
+            data = self._rebuild_presence_state(
+                list(self._all_clients), fire_events=False
+            )
+            await self.async_sync_tracker_entities()
+            return data
+
+        raise UpdateFailed(
+            f"UniFi client fetch failed: {fetch_error}"
+        ) from fetch_error
 
     async def _fetch_clients(self) -> list[dict[str, Any]]:
         """Fetch clients from UniFi API."""
@@ -621,6 +642,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         target["secondary_devices"] = []
         self._write_json(self.storage_path / PEOPLE_FILE, people_data)
         self._loader.reload()
+        self._rebuild_presence_state(list(self._all_clients), fire_events=False)
 
     async def track_device(
         self, mac: str, name: str, device_type: str = "other"
@@ -649,6 +671,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
                 self._write_json(self.storage_path / DEVICES_FILE, devices_data)
                 self._loader.reload()
+                self._rebuild_presence_state(list(self._all_clients), fire_events=False)
                 return
         devices.append(
             {
@@ -663,6 +686,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         devices_data["devices"] = devices
         self._write_json(self.storage_path / DEVICES_FILE, devices_data)
         self._loader.reload()
+        self._rebuild_presence_state(list(self._all_clients), fire_events=False)
 
     async def remove_device(self, mac: str) -> None:
         """Stop tracking / remove a device."""
@@ -715,6 +739,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._detach_mac_from_person(person, mac_n)
         self._write_json(self.storage_path / PEOPLE_FILE, people_data)
         self._loader.reload()
+        self._rebuild_presence_state(list(self._all_clients), fire_events=False)
 
     async def force_update_person(self, person: str) -> None:
         """Force a refresh (person filter currently ignored)."""
