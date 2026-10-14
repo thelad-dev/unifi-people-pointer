@@ -108,9 +108,6 @@ class UniFiPersonTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
         super().__init__(coordinator)
         self._person_id = person_data["id"]
         self._attr_name = person_data["name"]
-        self._primary_device = person_data.get("primary_device") or ""
-        self._secondary_devices = person_data.get("secondary_devices") or []
-        self._device_ids = person_data.get("device_ids") or []
         self._ha_person = person_data.get("ha_person")
         self._attr_unique_id = f"{DOMAIN}_person_{self._person_id}"
 
@@ -144,33 +141,73 @@ class UniFiPersonTracker(CoordinatorEntity[UniFiPeoplePointerCoordinator], Track
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return state attributes."""
         presence = self.coordinator.get_person_presence(self._person_id) or {}
+        primary, secondary = self._current_device_macs(presence)
         return {
             "person_id": self._person_id,
             "ha_person": self._ha_person,
-            "primary_device": self._get_primary_device_info(),
-            "secondary_devices": self._get_secondary_devices_info(),
+            "primary_device": {
+                "mac": primary,
+                "connected": bool(primary)
+                and self.coordinator.is_device_online(primary),
+            },
+            "secondary_devices": [
+                {
+                    "mac": mac,
+                    "connected": self.coordinator.is_device_online(mac),
+                }
+                for mac in secondary
+            ],
             "devices_online": presence.get("devices_online", 0),
             "online_device_ids": presence.get("online_device_ids", []),
             "source": "unifi_people_pointer",
         }
 
-    def _get_primary_device_info(self) -> dict[str, Any]:
-        """Get primary device info."""
-        return {
-            "mac": self._primary_device,
-            "connected": bool(self._primary_device)
-            and self.coordinator.is_device_online(self._primary_device),
-        }
+    def _current_device_macs(
+        self, presence: dict[str, Any]
+    ) -> tuple[str, list[str]]:
+        """Resolve primary/secondary MACs from live coordinator config."""
+        devices = list(presence.get("devices") or [])
+        if not devices:
+            person_devices = self.coordinator.get_person_devices(self._person_id)
+            primary_dev = person_devices.get("primary")
+            secondary_devs = list(person_devices.get("secondary") or [])
+            devices = ([primary_dev] if primary_dev else []) + secondary_devs
 
-    def _get_secondary_devices_info(self) -> list[dict[str, Any]]:
-        """Get secondary devices info."""
-        return [
-            {
-                "mac": mac,
-                "connected": self.coordinator.is_device_online(mac),
+        macs: list[str] = []
+        for device in devices:
+            if not isinstance(device, dict):
+                continue
+            mac = normalize_mac(str(device.get("mac") or ""))
+            if mac:
+                macs.append(mac)
+
+        if not macs:
+            # Fallback: people.json device_ids against current devices list.
+            person = next(
+                (
+                    p
+                    for p in self.coordinator.people
+                    if p.get("id") == self._person_id
+                ),
+                None,
+            )
+            device_ids = list((person or {}).get("device_ids") or [])
+            by_id = {
+                d.get("id"): d
+                for d in self.coordinator.devices
+                if isinstance(d, dict) and d.get("id")
             }
-            for mac in self._secondary_devices
-        ]
+            for device_id in device_ids:
+                device = by_id.get(device_id)
+                if not device:
+                    continue
+                mac = normalize_mac(str(device.get("mac") or ""))
+                if mac:
+                    macs.append(mac)
+
+        primary = macs[0] if macs else ""
+        secondary = macs[1:] if len(macs) > 1 else []
+        return primary, secondary
 
     @callback
     def _handle_coordinator_update(self) -> None:

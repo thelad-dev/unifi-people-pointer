@@ -50,7 +50,7 @@ def parse_clients(raw_data: list[dict[str, Any]] | None) -> list[dict[str, Any]]
             continue
 
         hostname = entry.get("hostname")
-        if hostname is None:
+        if hostname is None or not str(hostname).strip():
             hostname = (
                 entry.get("name")
                 or entry.get("hostName")
