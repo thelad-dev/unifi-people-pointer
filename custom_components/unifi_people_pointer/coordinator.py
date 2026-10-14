@@ -98,6 +98,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._site_key: str = "default"
         self._prev_online_device_ids: set[str] = set()
         self._prev_unknown_macs: set[str] = set()
+        self._prev_device_owners: dict[str, str | None] = {}
         self._events_primed: bool = False
         self._config_lock = asyncio.Lock()
         self.last_exception = ""
@@ -161,6 +162,25 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if mac:
                 self._device_event_macs[key] = mac
 
+        now_device_owners: dict[str, str | None] = {}
+        online_device_meta: dict[str, tuple[str, dict[str, Any], dict[str, Any] | None]] = {}
+        for device_id in now_online_ids:
+            key = str(device_id)
+            device = self._devices_by_id.get(device_id) or {}
+            client = self._live_client_for_device(device)
+            mac = self._device_event_macs.get(key, "")
+            if not mac:
+                if client and client.get("mac"):
+                    mac = str(client["mac"])
+                else:
+                    mac = normalize_mac(str(device.get("mac") or ""))
+                if not mac:
+                    mac = key
+                self._device_event_macs[key] = mac
+            person_id = self._person_id_for_device(key, mac)
+            now_device_owners[key] = person_id
+            online_device_meta[key] = (mac, device, client)
+
         event_manager = self.hass.data.get(DOMAIN, {}).get("event_manager")
         # After the first baseline, always process transitions/cancels whenever
         # the baseline advances (including config-only rebuilds).
@@ -186,8 +206,11 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             for person_id, row in self._presence_by_person.items():
                 was = previous.get(person_id, {}).get("is_home")
-                now_home = row.get("is_home")
-                if was is None or was == now_home:
+                now_home = bool(row.get("is_home"))
+                if was is None:
+                    if not now_home:
+                        continue
+                elif was == now_home:
                     continue
                 device_mac = ""
                 online_ids = row.get("online_device_ids") or []
@@ -210,29 +233,20 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         person=person_id, device=device_mac
                     )
 
-            for device_id in now_online_ids - self._prev_online_device_ids:
-                device = self._devices_by_id.get(device_id) or {}
-                client = self._live_client_for_device(device)
-                mac = self._device_event_macs.get(str(device_id), "")
-                if not mac:
-                    if client and client.get("mac"):
-                        mac = str(client["mac"])
-                    else:
-                        mac = normalize_mac(str(device.get("mac") or ""))
-                    if not mac:
-                        mac = str(device_id)
-                    self._device_event_macs[str(device_id)] = mac
-                person_id = None
-                configured_mac = normalize_mac(str(device.get("mac") or ""))
-                for person in self.people:
-                    if person_owns_device(
-                        person,
-                        device_id=str(device_id),
-                        device_mac=configured_mac or mac,
-                        devices=self.devices,
-                    ):
-                        person_id = person.get("id")
-                        break
+            for device_id in now_online_ids:
+                key = str(device_id)
+                mac, device, client = online_device_meta[key]
+                person_id = now_device_owners.get(key)
+                became_online = device_id not in self._prev_online_device_ids
+                owner_changed = (
+                    not became_online
+                    and key in self._prev_device_owners
+                    and self._prev_device_owners.get(key) != person_id
+                )
+                if not became_online and not owner_changed:
+                    continue
+                if owner_changed:
+                    event_manager.cancel_device_event(mac, EVENT_DEVICE_CONNECTED)
                 signal = None
                 if client is not None:
                     signal = client.get("signal")
@@ -271,6 +285,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for mac in self._prev_unknown_macs - now_unknown_macs:
                 event_manager.cancel_device_event(mac, EVENT_UNKNOWN_DEVICE)
 
+        self._prev_device_owners = now_device_owners
         self._prev_online_device_ids = now_online_ids
         self._prev_unknown_macs = now_unknown_macs
         self._events_primed = True
@@ -294,6 +309,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.last_exception = str(err)
             raw_clients = None
 
+        auth_failed = False
         async with self._config_lock:
             await self.hass.async_add_executor_job(self._loader.reload)
             if raw_clients is not None:
@@ -301,12 +317,17 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 data = self._rebuild_presence_state(all_clients)
             elif self._all_clients or self._clients_by_mac or self._presence_by_person:
                 data = self._rebuild_presence_state(list(self._all_clients))
+                auth_failed = isinstance(fetch_error, PermissionError)
             else:
                 raise UpdateFailed(
                     f"UniFi client fetch failed: {fetch_error}"
                 ) from fetch_error
 
         await self.async_sync_tracker_entities()
+        if auth_failed:
+            raise UpdateFailed(
+                f"UniFi authentication failed: {fetch_error}"
+            ) from fetch_error
         return data
 
     async def _fetch_clients(self) -> list[dict[str, Any]]:
@@ -430,6 +451,24 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if client and client.get("mac"):
             return str(client["mac"])
         return normalize_mac(str(device.get("mac") or ""))
+
+    def _person_id_for_device(
+        self, device_id: str, session_mac: str = ""
+    ) -> str | None:
+        """Return the person id that exclusively owns a configured device."""
+        device = self._devices_by_id.get(device_id) or {}
+        configured_mac = normalize_mac(str(device.get("mac") or ""))
+        mac = configured_mac or normalize_mac(session_mac)
+        for person in self.people:
+            if person_owns_device(
+                person,
+                device_id=str(device_id),
+                device_mac=mac,
+                devices=self.devices,
+            ):
+                pid = person.get("id")
+                return str(pid) if pid is not None else None
+        return None
 
     def is_device_online(self, mac: str) -> bool:
         """Return True if a still-configured device MAC is online."""
