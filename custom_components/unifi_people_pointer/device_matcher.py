@@ -24,6 +24,44 @@ def normalize_hostname_match(value: Any) -> list[str]:
     return []
 
 
+def _dedupe_devices_by_id(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Preserve order while dropping duplicate device ids."""
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for device in devices:
+        device_id = str(device.get("id") or "")
+        key = device_id or str(id(device))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(device)
+    return out
+
+
+def _exclusive_exact_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One client maps to at most one exact device via a stable device-id winner."""
+    uniq = _dedupe_devices_by_id(hits)
+    if not uniq:
+        return []
+    if len(uniq) == 1:
+        return uniq
+    winner = sorted(uniq, key=lambda d: str(d.get("id") or ""))[0]
+    return [winner]
+
+
+def _prefer_tracked_mac_hit(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Resolve duplicate MAC rows to a single preferred device."""
+    uniq = _dedupe_devices_by_id(hits)
+    if not uniq:
+        return []
+    tracked = [d for d in uniq if is_tracked(d)]
+    pool = tracked or uniq
+    if len(pool) == 1:
+        return pool
+    pool_sorted = sorted(pool, key=lambda d: str(d.get("id") or ""))
+    return [pool_sorted[0]]
+
+
 def exact_matching_devices(
     client: dict[str, Any], devices: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -33,6 +71,9 @@ def exact_matching_devices(
     1. configured MAC equality
     2. hostname_match token equality
     3. display-name equality (fallback only when no MAC/hostname_match hits)
+
+    Hostname and name tiers keep a single stable winner when multiple devices
+    share the same exact identity so one live client cannot dual-home two people.
     """
     candidates = [d for d in devices if isinstance(d, dict)]
     client_mac = normalize_mac(str(client.get("mac") or ""))
@@ -43,7 +84,7 @@ def exact_matching_devices(
             if normalize_mac(str(d.get("mac") or "")) == client_mac
         ]
         if mac_hits:
-            return mac_hits
+            return _prefer_tracked_mac_hit(mac_hits)
 
     hostname = client.get("hostname")
     if not hostname:
@@ -57,7 +98,7 @@ def exact_matching_devices(
                 hostname_hits.append(device)
                 break
     if hostname_hits:
-        return hostname_hits
+        return _exclusive_exact_hits(hostname_hits)
 
     name_hits: list[dict[str, Any]] = []
     for device in candidates:
@@ -66,7 +107,7 @@ def exact_matching_devices(
         name = str(device.get("name") or "").strip().lower()
         if name and name == host_l:
             name_hits.append(device)
-    return name_hits
+    return _exclusive_exact_hits(name_hits)
 
 
 def partial_matching_devices(

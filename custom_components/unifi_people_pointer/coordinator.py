@@ -134,11 +134,20 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._devices_by_id = {
             d["id"]: d for d in devices if isinstance(d, dict) and d.get("id")
         }
-        self._device_by_configured_mac = {
-            normalize_mac(str(d.get("mac") or "")): d
-            for d in devices
-            if isinstance(d, dict) and d.get("mac")
-        }
+        mac_index: dict[str, dict[str, Any]] = {}
+        for device in devices:
+            if not isinstance(device, dict) or not device.get("mac"):
+                continue
+            mac_n = normalize_mac(str(device.get("mac") or ""))
+            if not mac_n:
+                continue
+            existing = mac_index.get(mac_n)
+            if existing is None:
+                mac_index[mac_n] = device
+                continue
+            if is_tracked(device) and not is_tracked(existing):
+                mac_index[mac_n] = device
+        self._device_by_configured_mac = mac_index
 
         presence_rows = determine_presence(self.people, devices, all_clients)
         previous = self._presence_by_person

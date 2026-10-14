@@ -92,3 +92,56 @@ def test_name_exact_does_not_compete_with_hostname_match_peer() -> None:
         {"mac": "99:99:99:99:99:99", "hostname": "iPhone-SK", "is_wired": False}
     ]
     assert _online_device_ids(devices, clients) == {"iphone-sk"}
+
+
+def test_ambiguous_exact_name_does_not_dual_home() -> None:
+    """Two devices with the same display name yield one exclusive exact winner."""
+    devices = [
+        {
+            "id": "jan-phone",
+            "name": "iPhone",
+            "mac": "aa:bb:cc:dd:ee:01",
+            "hostname_match": [],
+            "track": True,
+        },
+        {
+            "id": "seb-phone",
+            "name": "iPhone",
+            "mac": "aa:bb:cc:dd:ee:02",
+            "hostname_match": [],
+            "track": True,
+        },
+    ]
+    clients = [{"mac": "11:22:33:44:55:66", "hostname": "iPhone", "is_wired": False}]
+    online = _online_device_ids(devices, clients)
+    assert online == {"jan-phone"}
+
+    people = [
+        {"id": "janine", "name": "Janine", "device_ids": ["jan-phone"]},
+        {"id": "sebastian", "name": "Sebastian", "device_ids": ["seb-phone"]},
+    ]
+    presence = {row["id"]: row for row in determine_presence(people, devices, clients)}
+    assert presence["janine"]["is_home"] is True
+    assert presence["sebastian"]["is_home"] is False
+
+
+def test_ambiguous_exact_hostname_match_does_not_dual_home() -> None:
+    """Shared exact hostname_match token homes only one stable device."""
+    devices = [
+        {
+            "id": "watch-b",
+            "name": "Watch B",
+            "mac": "aa:bb:cc:dd:ee:21",
+            "hostname_match": ["Watch"],
+            "track": True,
+        },
+        {
+            "id": "watch-a",
+            "name": "Watch A",
+            "mac": "aa:bb:cc:dd:ee:20",
+            "hostname_match": ["Watch"],
+            "track": True,
+        },
+    ]
+    clients = [{"mac": "11:22:33:44:55:66", "hostname": "Watch", "is_wired": False}]
+    assert _online_device_ids(devices, clients) == {"watch-a"}

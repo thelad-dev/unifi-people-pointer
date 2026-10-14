@@ -333,3 +333,36 @@ async def test_untracked_mac_not_online(hass, tmp_path) -> None:
     primary = person_devices.get("primary") or {}
     assert primary.get("connected") is False
     _stop_coordinator(coordinator)
+
+
+async def test_mac_index_prefers_tracked_over_untracked_shadow(hass, tmp_path) -> None:
+    """Duplicate MAC rows keep the tracked device for is_device_online."""
+    coordinator = await _make_coordinator(hass, tmp_path=tmp_path)
+    mac = "aa:bb:cc:dd:ee:50"
+    devices = [
+        {
+            "id": "phone",
+            "name": "Phone",
+            "mac": mac,
+            "type": "phone",
+            "track": True,
+            "hostname_match": [],
+        },
+        {
+            "id": "legacy",
+            "name": "Legacy",
+            "mac": mac,
+            "type": "phone",
+            "track": False,
+            "hostname_match": [],
+        },
+    ]
+    people = [{"id": "janine", "name": "Janine", "device_ids": ["phone"]}]
+    _set_config(coordinator, people=people, devices=devices)
+    coordinator._rebuild_presence_state([_client(mac, hostname="phone")])
+
+    assert coordinator.get_person_state("janine") == "home"
+    assert coordinator.is_device_online(mac) is True
+    indexed = coordinator._device_by_configured_mac.get(mac) or {}
+    assert indexed.get("id") == "phone"
+    _stop_coordinator(coordinator)
