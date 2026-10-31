@@ -19,7 +19,7 @@ UniFi People Pointer ist eine fortschrittliche Home Assistant Integration, die P
 - **Intelligente Events**: Automatische Benachrichtigungen bei Ankommen/Verlassen
 - **Unbekannte Geräte**: Warnung bei neuen Geräten im Netzwerk
 - **HACS**: Installation als Custom Repository (noch nicht im HACS Default Store)
-- **Access Points**: Tracker zeigen den AP, an dem ein Gerät hängt, z. B. `iPhone-SKHL AP: EG-Diele`
+- **Access Points**: Tracker zeigen den AP, an dem ein Gerät hängt, z. B. `Phone AP: Living-Room`
 - **Web-UI**: Wird mit der Integration installiert, Seitenleisten-Eintrag "People Pointer"
 
 #### 🚀 Installation
@@ -126,7 +126,7 @@ Manuelle Änderungen an `people.json` / `devices.json` greift der nächste Poll 
 
 #### 📶 Access-Point-Namen
 
-Solange ein Gerät verbunden ist, heißt sein Tracker `<Name> AP: <AP-Name>` (z. B. `iPhone-SKHL AP: EG-Diele`), der Personen-Tracker zeigt den AP des ersten verbundenen Geräts. Der AP-Name kommt aus der UniFi-Geräteliste und folgt beim Roaming mit dem nächsten Poll. Zusätzlich gibt es das Attribut `ap_name` (Tracker und je Client in den Unknown-/Guest-Sensoren). Die Entity-IDs bleiben unverändert; ein in HA vergebener eigener Anzeigename ersetzt den Zusatz.
+Solange ein Gerät verbunden ist, heißt sein Tracker `<Name> AP: <AP-Name>` (z. B. `Phone AP: Living-Room`), der Personen-Tracker zeigt den AP des ersten verbundenen Geräts. Der AP-Name kommt aus der UniFi-Geräteliste und folgt beim Roaming mit dem nächsten Poll. Zusätzlich gibt es das Attribut `ap_name` (Tracker und je Client in den Unknown-/Guest-Sensoren). Die Entity-IDs bleiben unverändert; ein in HA vergebener eigener Anzeigename ersetzt den Zusatz.
 
 #### 🔧 Web-UI
 
@@ -164,7 +164,7 @@ UniFi People Pointer is an advanced Home Assistant integration that tracks peopl
 - **Smart Events**: Automatic notifications for arrivals/departures
 - **Unknown Devices**: Alerts for new devices on the network
 - **HACS**: Install via custom repository (not yet in the HACS default store)
-- **Access points**: Trackers show the AP a device is connected to, e.g. `iPhone-SKHL AP: EG-Diele`
+- **Access points**: Trackers show the AP a device is connected to, e.g. `Phone AP: Living-Room`
 - **Web UI**: Installed with the integration, sidebar entry "People Pointer"
 
 #### 🚀 Installation
@@ -271,7 +271,7 @@ Manual edits to `people.json` / `devices.json` are picked up on the next poll (n
 
 #### 📶 Access point names
 
-While a device is connected its tracker is named `<name> AP: <AP name>` (e.g. `iPhone-SKHL AP: EG-Diele`); person trackers show the AP of their first connected device. The AP name comes from the UniFi device list and follows roaming on the next poll. The `ap_name` attribute is also set (trackers, and per client in the unknown/guest sensors). Entity ids do not change; a custom name set in HA replaces the suffix.
+While a device is connected its tracker is named `<name> AP: <AP name>` (e.g. `Phone AP: Living-Room`); person trackers show the AP of their first connected device. The AP name comes from the UniFi device list and follows roaming on the next poll. The `ap_name` attribute is also set (trackers, and per client in the unknown/guest sensors). Entity ids do not change; a custom name set in HA replaces the suffix.
 
 #### 🔧 Web UI
 
