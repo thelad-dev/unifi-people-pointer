@@ -1,139 +1,112 @@
-import { useEffect, useState } from 'react';
-import api from '../api';
+import { useState } from 'react';
+import api, { DEVICE_TYPES, Device, errorText, Person } from '../api';
+import { useApi } from '../useApi';
 
-interface Device {
-  id: string;
+interface Form {
+  name: string;
   mac: string;
-  name: string;
-  personId?: string;
-  lastSeen?: string;
+  type: string;
+  person: string;
+  role: 'primary' | 'secondary';
 }
 
-interface Person {
-  id: string;
-  name: string;
-}
+const EMPTY: Form = { name: '', mac: '', type: 'smartphone', person: '', role: 'secondary' };
 
 function Devices() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [persons, setPersons] = useState<Person[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: devices, error, reload } = useApi<Device[]>('/devices');
+  const { data: persons } = useApi<Person[]>('/persons');
+  const [editing, setEditing] = useState<Device | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
-  const [formData, setFormData] = useState({ mac: '', name: '', personId: '' });
+  const [form, setForm] = useState<Form>(EMPTY);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const personName = (id: string | null) =>
+    (id && persons?.find((p) => p.id === id)?.name) || id || '-';
 
-  const fetchData = async () => {
-    try {
-      const [devicesRes, personsRes] = await Promise.all([
-        api.get('/devices'),
-        api.get('/persons'),
-      ]);
-      setDevices(devicesRes.data);
-      setPersons(personsRes.data);
-    } catch (err) {
-      console.error('Failed to load devices:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAdd = () => {
-    setEditingDevice(null);
-    setFormData({ mac: '', name: '', personId: '' });
+  const open = (device: Device | null) => {
+    setEditing(device);
+    setForm(
+      device
+        ? { name: device.name, mac: device.mac, type: device.type, person: device.person || '', role: 'secondary' }
+        : EMPTY,
+    );
+    setFormError(null);
     setShowModal(true);
   };
 
-  const handleEdit = (device: Device) => {
-    setEditingDevice(device);
-    setFormData({ 
-      mac: device.mac, 
-      name: device.name, 
-      personId: device.personId || '' 
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this device?')) return;
-    
+  const remove = async (device: Device) => {
+    if (!confirm(`Stop tracking ${device.name}?`)) return;
     try {
-      await api.delete(`/devices/${id}`);
-      fetchData();
+      await api.delete(`/devices/${encodeURIComponent(device.id)}`);
+      reload();
     } catch (err) {
-      console.error('Failed to delete device:', err);
+      alert(errorText(err));
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     try {
-      if (editingDevice) {
-        await api.put(`/devices/${editingDevice.id}`, formData);
-      } else {
-        await api.post('/devices', formData);
-      }
+      if (editing) await api.put(`/devices/${encodeURIComponent(editing.id)}`, form);
+      else await api.post('/devices', form);
       setShowModal(false);
-      fetchData();
+      reload();
     } catch (err) {
-      console.error('Failed to save device:', err);
+      setFormError(errorText(err));
     }
   };
 
-  const getPersonName = (personId?: string) => {
-    if (!personId) return '-';
-    const person = persons.find(p => p.id === personId);
-    return person?.name || '-';
-  };
-
-  if (loading) {
-    return <div className="loading">Loading devices...</div>;
-  }
+  if (error && !devices) return <div className="error">{error}</div>;
+  if (!devices) return <div className="loading">Loading devices...</div>;
 
   return (
     <div>
-      <div className="page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h2>Device Management</h2>
-            <p>Manage tracked devices and their associations</p>
-          </div>
-          <button onClick={handleAdd}>Add Device</button>
+      <div className="page-header page-header-actions">
+        <div>
+          <h2>Devices</h2>
+          <p>Tracked devices, their owner and current access point</p>
         </div>
+        <button onClick={() => open(null)}>Add device</button>
       </div>
 
       {devices.length === 0 ? (
         <div className="empty-state">
           <h3>No devices yet</h3>
-          <p>Add your first device to start tracking</p>
+          <p>Add a device by MAC address or claim one from Unknown Clients.</p>
         </div>
       ) : (
-        <div className="card">
+        <div className="card table-wrap">
           <table className="table">
             <thead>
               <tr>
                 <th>Name</th>
-                <th>MAC Address</th>
+                <th>Status</th>
                 <th>Person</th>
-                <th>Last Seen</th>
-                <th>Actions</th>
+                <th>Type</th>
+                <th>MAC address</th>
+                <th>Signal</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {devices.map(device => (
-                <tr key={device.id}>
-                  <td>{device.name}</td>
-                  <td><code>{device.mac}</code></td>
-                  <td>{getPersonName(device.personId)}</td>
-                  <td>{device.lastSeen ? new Date(device.lastSeen).toLocaleString() : '-'}</td>
+              {devices.map((d) => (
+                <tr key={d.id}>
+                  <td>{d.name}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button onClick={() => handleEdit(device)}>Edit</button>
-                      <button className="button-danger" onClick={() => handleDelete(device.id)}>Delete</button>
+                    {d.online ? (
+                      <span className="badge badge-success">{d.ap_name ? `AP: ${d.ap_name}` : 'Online'}</span>
+                    ) : (
+                      <span className="badge badge-neutral">Away</span>
+                    )}
+                  </td>
+                  <td>{personName(d.person)}</td>
+                  <td>{d.type}</td>
+                  <td><code>{d.mac}</code></td>
+                  <td>{d.signal != null ? `${d.signal} dBm` : '-'}</td>
+                  <td>
+                    <div className="button-row">
+                      <button onClick={() => open(d)}>Edit</button>
+                      <button className="button-danger" onClick={() => remove(d)}>Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -146,39 +119,58 @@ function Devices() {
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{editingDevice ? 'Edit Device' : 'Add Device'}</h3>
-            <form onSubmit={handleSubmit}>
+            <h3>{editing ? 'Edit device' : 'Add device'}</h3>
+            {formError && <div className="error">{formError}</div>}
+            <form onSubmit={submit}>
               <div className="form-group">
                 <label>Name</label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
                 />
               </div>
               <div className="form-group">
-                <label>MAC Address</label>
+                <label>MAC address</label>
                 <input
                   type="text"
-                  value={formData.mac}
-                  onChange={(e) => setFormData({ ...formData, mac: e.target.value })}
-                  placeholder="00:11:22:33:44:55"
+                  value={form.mac}
+                  onChange={(e) => setForm({ ...form, mac: e.target.value })}
+                  placeholder="aa:bb:cc:dd:ee:ff"
+                  disabled={!!editing}
                   required
                 />
               </div>
               <div className="form-group">
-                <label>Assign to Person (optional)</label>
-                <select
-                  value={formData.personId}
-                  onChange={(e) => setFormData({ ...formData, personId: e.target.value })}
-                >
-                  <option value="">None</option>
-                  {persons.map(person => (
-                    <option key={person.id} value={person.id}>{person.name}</option>
+                <label>Type</label>
+                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                  {DEVICE_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
               </div>
+              <div className="form-group">
+                <label>Person</label>
+                <select value={form.person} onChange={(e) => setForm({ ...form, person: e.target.value })}>
+                  <option value="">Nobody</option>
+                  {(persons || []).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              {form.person && (
+                <div className="form-group">
+                  <label>Role</label>
+                  <select
+                    value={form.role}
+                    onChange={(e) => setForm({ ...form, role: e.target.value as Form['role'] })}
+                  >
+                    <option value="primary">Primary device</option>
+                    <option value="secondary">Secondary device</option>
+                  </select>
+                </div>
+              )}
               <div className="button-group">
                 <button type="submit">Save</button>
                 <button type="button" className="button-secondary" onClick={() => setShowModal(false)}>

@@ -37,14 +37,13 @@
 - Form schema keys: `host`, `api_token`, `verify_ssl`
 - Entry data keys: `CONF_HOST`, `CONF_TOKEN` (`token`), `verify_ssl` — form `api_token` is mapped to `CONF_TOKEN` on create
 - `validate_api_connection` hits `GET /proxy/network/integration/v1/sites` with `X-API-KEY`
-- Options flow updates `scan_interval`; reauth step is `reauth_confirm`
+- Options flow updates `scan_interval` and `webui_port`; reauth step is `reauth_confirm`
 - No `NotImplementedError` on config/setup path (avoids HA HTTP 500 when adding the integration)
 
 **Still limited / later:**
 
 - Mobile-app and ping fallbacks not fully wired
 - OUI database update and file watcher are incomplete
-- Optional Node/React backend remains separate from the HA integration path
 
 ## Architecture Decisions
 
@@ -164,9 +163,7 @@ When testing this integration:
 - AP zone mapping polish
 
 ### Phase 5: Web UI
-- React frontend
-- Node.js backend
-- Docker deployment
+- Shipped inside the integration (see `webui.py`, `frontend/`); no Node backend or Docker
 
 ## Common Issues & Solutions
 

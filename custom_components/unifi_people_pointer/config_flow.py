@@ -15,7 +15,14 @@ from homeassistant.const import CONF_HOST, CONF_TOKEN
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DEFAULT_VERIFY_SSL, DOMAIN
+from .const import (
+    CONF_WEBUI_PORT,
+    DEFAULT_VERIFY_SSL,
+    DEFAULT_WEBUI_PORT,
+    DOMAIN,
+    MAX_WEBUI_PORT,
+    MIN_WEBUI_PORT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -275,6 +282,9 @@ class UniFiPeoplePointerOptionsFlow(config_entries.OptionsFlow):
         current = self._config_entry.options.get(
             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
         )
+        current_port = self._config_entry.options.get(
+            CONF_WEBUI_PORT, DEFAULT_WEBUI_PORT
+        )
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -285,6 +295,13 @@ class UniFiPeoplePointerOptionsFlow(config_entries.OptionsFlow):
                     ): vol.All(
                         vol.Coerce(int),
                         vol.Range(min=MIN_SCAN_INTERVAL, max=MAX_SCAN_INTERVAL),
+                    ),
+                    vol.Optional(
+                        CONF_WEBUI_PORT,
+                        default=current_port,
+                    ): vol.All(
+                        vol.Coerce(int),
+                        vol.Range(min=MIN_WEBUI_PORT, max=MAX_WEBUI_PORT),
                     ),
                 }
             ),

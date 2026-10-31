@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -18,9 +19,11 @@ from .api_parser import (
     deduplicate_clients,
     filter_wireless_only,
     normalize_mac,
+    parse_access_point_names,
     parse_clients,
 )
 from .const import (
+    AP_NAMES_REFRESH_SECONDS,
     CONF_VERIFY_SSL,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_VERIFY_SSL,
@@ -106,6 +109,13 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._events_primed: bool = False
         self._config_lock = asyncio.Lock()
         self.last_exception = ""
+        # UniFi device name by normalized AP MAC (and by device id for the
+        # integration API, whose clients reference ``uplinkDeviceId``).
+        self._ap_names: dict[str, str] = {}
+        self._ap_names_fetched_at: float = 0.0
+        # AP keys seen at the last fetch that UniFi did not name (no re-fetch
+        # loop for nameless APs).
+        self._ap_unresolved: set[str] = set()
 
     @property
     def people(self) -> list[dict[str, Any]]:
@@ -265,7 +275,8 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     mac=mac,
                     person=person_id,
                     device_type=cfg_device.get("type"),
-                    ap_name=(live_client or {}).get("ap_mac"),
+                    ap_name=self.get_client_ap_name(live_client)
+                    or (live_client or {}).get("ap_mac"),
                     signal_strength=signal if isinstance(signal, int) else None,
                 )
 
@@ -287,7 +298,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     mac=mac,
                     ip=client.get("ip"),
                     hostname=client.get("hostname") or None,
-                    ap_name=client.get("ap_mac"),
+                    ap_name=self.get_client_ap_name(client) or client.get("ap_mac"),
                     signal_strength=signal if isinstance(signal, int) else None,
                 )
 
@@ -317,6 +328,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             fetch_error = err
             self.last_exception = str(err)
             raw_clients = None
+
+        if raw_clients is not None:
+            await self._async_refresh_ap_names(raw_clients)
 
         auth_failed = False
         async with self._config_lock:
@@ -414,6 +428,126 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if isinstance(payload, list):
                     return payload
                 raise ConnectionError("UniFi clients API returned no client list")
+
+    def _ap_names_stale(self, raw_clients: list[dict[str, Any]]) -> bool:
+        """Return True when the AP name map should be re-fetched."""
+        if not self._ap_names_fetched_at:
+            return True
+        if time.monotonic() - self._ap_names_fetched_at >= AP_NAMES_REFRESH_SECONDS:
+            return True
+        known = self._ap_names.keys() | self._ap_unresolved
+        return bool(self._client_ap_keys(raw_clients) - known)
+
+    @staticmethod
+    def _client_ap_keys(raw_clients: list[dict[str, Any]]) -> set[str]:
+        """AP keys referenced by a raw client list."""
+        return {
+            str(client["ap_mac"])
+            for client in parse_clients(raw_clients)
+            if client.get("ap_mac") and not client.get("is_wired")
+        }
+
+    async def _async_refresh_ap_names(self, raw_clients: list[dict[str, Any]]) -> None:
+        """Refresh AP names; keep the previous map when UniFi does not answer."""
+        if not self._ap_names_stale(raw_clients):
+            return
+        try:
+            names = await self._fetch_access_points()
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("UniFi device list for AP names failed: %s", err)
+            # Do not retry on every poll while the device list is unavailable.
+            self._ap_names_fetched_at = time.monotonic()
+            return
+        self._ap_names = names
+        self._ap_names_fetched_at = time.monotonic()
+        self._ap_unresolved = {
+            key
+            for key in self._client_ap_keys(raw_clients)
+            if key not in names and key.lower() not in names
+        }
+
+    async def _fetch_access_points(self) -> dict[str, str]:
+        """Fetch UniFi network devices and map AP MAC / device id to name."""
+        host = str(self.config_entry.data[CONF_HOST])
+        token = str(self.config_entry.data[CONF_TOKEN])
+        verify_ssl = bool(
+            self.config_entry.data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
+        )
+        ssl_param: bool | object = verify_ssl if verify_ssl else False
+        base = f"https://{_host_for_url(host)}"
+        headers = {"Accept": "application/json", "X-API-KEY": token}
+        timeout = aiohttp.ClientTimeout(total=20)
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            for path in ("stat/device-basic", "stat/device"):
+                url = f"{base}/proxy/network/api/s/{self._site_key}/{path}"
+                try:
+                    async with session.get(
+                        url, headers=headers, ssl=ssl_param
+                    ) as response:
+                        if response.status >= 400:
+                            continue
+                        payload = await response.json(content_type=None)
+                except (
+                    aiohttp.ClientError,
+                    asyncio.TimeoutError,
+                    ValueError,
+                    TypeError,
+                ) as err:
+                    _LOGGER.debug("Classic %s endpoint failed: %s", path, err)
+                    continue
+                if isinstance(payload, dict) and isinstance(payload.get("data"), list):
+                    names = parse_access_point_names(payload["data"])
+                    if names:
+                        return names
+
+            if not self._site_id:
+                site_id, site_key = await self._resolve_site(
+                    session, base, headers, ssl_param
+                )
+                self._site_id = site_id
+                self._site_key = site_key
+            integ_url = (
+                f"{base}/proxy/network/integration/v1/sites/{self._site_id}/devices"
+                "?limit=200"
+            )
+            async with session.get(
+                integ_url, headers=headers, ssl=ssl_param
+            ) as response:
+                if response.status >= 400:
+                    raise ConnectionError(
+                        f"UniFi devices API returned HTTP {response.status}"
+                    )
+                payload = await response.json(content_type=None)
+            rows = payload.get("data") if isinstance(payload, dict) else payload
+            return parse_access_point_names(rows if isinstance(rows, list) else [])
+
+    def get_ap_name(self, ap_mac: str | None) -> str | None:
+        """Return the UniFi device name for an AP MAC (or integration device id)."""
+        if not ap_mac:
+            return None
+        key = normalize_mac(str(ap_mac))
+        return self._ap_names.get(key) or self._ap_names.get(str(ap_mac).lower())
+
+    def get_client_ap_name(self, client: dict[str, Any] | None) -> str | None:
+        """Return the AP name a live client is connected to."""
+        if not client or client.get("is_wired"):
+            return None
+        name = self.get_ap_name(client.get("ap_mac"))
+        if name:
+            return name
+        raw = client.get("raw")
+        if isinstance(raw, dict):
+            uplink = str(raw.get("last_uplink_name") or "").strip()
+            if uplink:
+                return uplink
+        return None
+
+    def get_device_ap_name(self, mac: str) -> str | None:
+        """Return the AP name of the live client behind a configured MAC."""
+        if not mac:
+            return None
+        return self.get_client_ap_name(self.async_get_client_by_mac(mac))
 
     async def _resolve_site(
         self,
@@ -541,6 +675,18 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def get_person_presence(self, person_id: str) -> dict[str, Any] | None:
         """Return presence row for person."""
         return self._presence_by_person.get(person_id)
+
+    def get_person_ap_name(self, person_id: str) -> str | None:
+        """Return the AP name of the first online device of a person at home."""
+        row = self._presence_by_person.get(person_id)
+        if not row or not row.get("is_home"):
+            return None
+        for device_id in row.get("online_device_ids") or []:
+            device = self._devices_by_id.get(str(device_id))
+            name = self.get_client_ap_name(self._live_client_for_device(device))
+            if name:
+                return name
+        return None
 
     def get_person_zone(self, person_id: str) -> str | None:
         """Return zone hint if available."""
@@ -821,6 +967,122 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             person["device_ids"] = ids
             self._detach_mac_from_person(person, mac_n)
         self._write_json(self.storage_path / PEOPLE_FILE, people_data)
+
+    async def _async_apply_config_change(self, sync_fn: Any, *args: Any) -> Any:
+        """Run a JSON edit under the config lock and publish the new state."""
+        async with self._config_lock:
+            result = await self.hass.async_add_executor_job(sync_fn, *args)
+            self._loader.reload()
+            data = self._rebuild_presence_state(list(self._all_clients))
+            self.async_set_updated_data(data)
+        await self.async_sync_tracker_entities()
+        return result
+
+    async def save_person(
+        self, person_id: str, name: str, ha_person: str | None = None
+    ) -> dict[str, Any]:
+        """Create or update a person (name and HA person link)."""
+        return await self._async_apply_config_change(
+            self._save_person_sync, person_id, name, ha_person
+        )
+
+    def _save_person_sync(
+        self, person_id: str, name: str, ha_person: str | None
+    ) -> dict[str, Any]:
+        people_data = self._read_people_file()
+        people = list(people_data.get("people") or [])
+        person = next((p for p in people if p.get("id") == person_id), None)
+        if person is None:
+            person = {"id": person_id, "device_ids": []}
+            people.append(person)
+        person["name"] = name
+        if ha_person:
+            person["ha_person"] = ha_person
+        else:
+            person.pop("ha_person", None)
+        people_data["people"] = people
+        self._write_json(self.storage_path / PEOPLE_FILE, people_data)
+        return dict(person)
+
+    async def delete_person(self, person_id: str) -> bool:
+        """Remove a person; its devices stay configured but unassigned."""
+        return await self._async_apply_config_change(
+            self._delete_person_sync, person_id
+        )
+
+    def _delete_person_sync(self, person_id: str) -> bool:
+        people_data = self._read_people_file()
+        people = list(people_data.get("people") or [])
+        kept = [p for p in people if p.get("id") != person_id]
+        if len(kept) == len(people):
+            return False
+        people_data["people"] = kept
+        self._write_json(self.storage_path / PEOPLE_FILE, people_data)
+        return True
+
+    async def update_device(
+        self, device_id: str, name: str, device_type: str
+    ) -> dict[str, Any] | None:
+        """Rename a configured device or change its type."""
+        return await self._async_apply_config_change(
+            self._update_device_sync, device_id, name, device_type
+        )
+
+    def _update_device_sync(
+        self, device_id: str, name: str, device_type: str
+    ) -> dict[str, Any] | None:
+        devices_data = self._read_devices_file()
+        for device in devices_data.get("devices") or []:
+            if device.get("id") == device_id:
+                device["name"] = name
+                device["type"] = device_type
+                self._write_json(self.storage_path / DEVICES_FILE, devices_data)
+                return dict(device)
+        return None
+
+    async def unassign_device(self, device_id: str) -> None:
+        """Detach a configured device from every person."""
+        await self._async_apply_config_change(self._unassign_device_sync, device_id)
+
+    def _unassign_device_sync(self, device_id: str) -> None:
+        device = next(
+            (
+                d
+                for d in self._read_devices_file().get("devices") or []
+                if d.get("id") == device_id
+            ),
+            None,
+        )
+        mac_n = normalize_mac(str((device or {}).get("mac") or ""))
+        people_data = self._read_people_file()
+        for person in people_data.get("people") or []:
+            person["device_ids"] = [
+                i for i in (person.get("device_ids") or []) if i != device_id
+            ]
+            if mac_n:
+                self._detach_mac_from_person(person, mac_n)
+        self._write_json(self.storage_path / PEOPLE_FILE, people_data)
+
+    def get_access_points(self) -> list[dict[str, Any]]:
+        """Access points known from UniFi with their current wireless clients."""
+        counts: dict[str, int] = {}
+        for client in filter_wireless_only(self._all_clients):
+            key = client.get("ap_mac")
+            if key:
+                counts[str(key)] = counts.get(str(key), 0) + 1
+        rows: dict[str, dict[str, Any]] = {}
+        for key, name in self._ap_names.items():
+            if ":" not in key:
+                continue  # integration API device ids mirror the MAC rows
+            rows[key] = {"mac": key, "name": name, "clients": counts.get(key, 0)}
+        for key, count in counts.items():
+            if key in rows:
+                continue
+            name = self.get_ap_name(key)
+            if name and any(r["name"] == name for r in rows.values()):
+                continue
+            rows[key] = {"mac": key, "name": name, "clients": count}
+        return sorted(rows.values(), key=lambda r: (r["name"] or r["mac"]).lower())
 
     async def force_update_person(self, person: str) -> None:
         """Force a refresh (person filter currently ignored)."""

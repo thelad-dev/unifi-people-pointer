@@ -81,13 +81,13 @@ def parse_clients(raw_data: list[dict[str, Any]] | None) -> list[dict[str, Any]]
         if last_seen is None:
             last_seen = entry.get("lastSeen")
 
-        ap_raw = (
-            entry.get("ap_mac")
-            or entry.get("apMac")
-            or entry.get("uplinkDeviceId")
-            or entry.get("uplink_device_id")
-        )
-        ap_mac = normalize_mac(str(ap_raw)) if ap_raw else None
+        ap_raw = entry.get("ap_mac") or entry.get("apMac")
+        if ap_raw:
+            ap_mac: str | None = normalize_mac(str(ap_raw))
+        else:
+            # Integration API: the AP is referenced by its device id, not a MAC.
+            uplink = entry.get("uplinkDeviceId") or entry.get("uplink_device_id")
+            ap_mac = str(uplink).strip().lower() if uplink else None
 
         clients.append(
             {
@@ -110,6 +110,33 @@ def parse_clients(raw_data: list[dict[str, Any]] | None) -> list[dict[str, Any]]
             }
         )
     return clients
+
+
+def parse_access_point_names(
+    raw_devices: list[dict[str, Any]] | None,
+) -> dict[str, str]:
+    """Map UniFi network devices to their names.
+
+    Keys are the normalized device MAC and, for integration API rows, the
+    lower-case device id (clients there reference ``uplinkDeviceId``).
+    Devices without a name are skipped so callers can fall back to the MAC.
+    """
+    names: dict[str, str] = {}
+    for device in raw_devices or []:
+        if not isinstance(device, dict):
+            continue
+        name = str(device.get("name") or "").strip()
+        if not name:
+            continue
+        mac_raw = device.get("mac") or device.get("macAddress")
+        if mac_raw:
+            mac = normalize_mac(str(mac_raw))
+            if mac:
+                names[mac] = name
+        device_id = device.get("id") or device.get("_id")
+        if device_id:
+            names[str(device_id).lower()] = name
+    return names
 
 
 def filter_wireless_only(clients: list[dict[str, Any]]) -> list[dict[str, Any]]:

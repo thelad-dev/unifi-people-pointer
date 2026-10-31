@@ -48,7 +48,7 @@
 }
 
 .page-header h2 {
-  color: var(--primary-color);
+  color: var(--accent);
 }
 
 .grid {
@@ -66,7 +66,7 @@
 
 .stat-card {
   background-color: var(--surface);
-  border-left: 4px solid var(--primary-color);
+  border-left: 4px solid var(--accent);
   padding: 1.5rem;
   border-radius: 4px;
 }
@@ -82,7 +82,7 @@
 .stat-card .value {
   font-size: 2rem;
   font-weight: bold;
-  color: var(--primary-color);
+  color: var(--accent);
 }
 
 .loading {
@@ -107,4 +107,109 @@
 
 .empty-state h3 {
   color: var(--text-secondary);
+}
+
+.navbar-menu a.active {
+  background-color: var(--primary-dark);
+}
+
+.navbar-menu {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.page-header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.section {
+  margin-top: 2rem;
+}
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.table .button-row {
+  margin-top: 0;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin-top: 1rem;
+}
+
+.facts dt {
+  color: var(--text-secondary);
+}
+
+.muted {
+  color: var(--text-secondary);
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.badge-neutral {
+  background-color: var(--border);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+/* Scroll wide tables instead of breaking names and AP badges. */
+.table-wrap .table th,
+.table-wrap .table td,
+.badge {
+  white-space: nowrap;
+}
+
+.token-card {
+  max-width: 560px;
+  margin: 2rem auto;
+}
+
+.token-card p {
+  margin: 0.75rem 0 1rem;
+  color: var(--text-secondary);
+}
+
+.button-small {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .navbar {
+    padding: 1rem;
+  }
+
+  .navbar-menu {
+    gap: 0.25rem;
+  }
+
+  .main-content {
+    padding: 1rem;
+  }
+
+  .page-header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

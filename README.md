@@ -19,7 +19,8 @@ UniFi People Pointer ist eine fortschrittliche Home Assistant Integration, die P
 - **Intelligente Events**: Automatische Benachrichtigungen bei Ankommen/Verlassen
 - **Unbekannte Geräte**: Warnung bei neuen Geräten im Netzwerk
 - **HACS**: Installation als Custom Repository (noch nicht im HACS Default Store)
-- **Web-UI**: Optionales Web-Interface zur Verwaltung (in Entwicklung)
+- **Access Points**: Tracker zeigen den AP, an dem ein Gerät hängt, z. B. `iPhone-SKHL AP: EG-Diele`
+- **Web-UI**: Wird mit der Integration installiert, Seitenleisten-Eintrag "People Pointer"
 
 #### 🚀 Installation
 
@@ -123,21 +124,13 @@ Manuelle Änderungen an `people.json` / `devices.json` greift der nächste Poll 
 - `unifi_people_pointer_device_connected` - Gerät verbunden
 - `unifi_people_pointer_unknown_device` - Unbekanntes Gerät entdeckt
 
-#### 🔧 Web-UI (Optional)
+#### 📶 Access-Point-Namen
 
-Das Projekt enthält ein optionales Web-Interface zur einfacheren Verwaltung:
+Solange ein Gerät verbunden ist, heißt sein Tracker `<Name> AP: <AP-Name>` (z. B. `iPhone-SKHL AP: EG-Diele`), der Personen-Tracker zeigt den AP des ersten verbundenen Geräts. Der AP-Name kommt aus der UniFi-Geräteliste und folgt beim Roaming mit dem nächsten Poll. Zusätzlich gibt es das Attribut `ap_name` (Tracker und je Client in den Unknown-/Guest-Sensoren). Die Entity-IDs bleiben unverändert; ein in HA vergebener eigener Anzeigename ersetzt den Zusatz.
 
-```bash
-cd backend
-npm install
-npm run dev
-```
+#### 🔧 Web-UI
 
-Das Interface läuft auf `http://localhost:3000` und bietet:
-- Personen & Geräte Verwaltung
-- Zonen-Konfiguration (Access Points)
-- OUI Datenbank Management
-- Live UniFi Client Monitoring
+Die Web-UI ist Teil der Integration, eine Zusatzinstallation gibt es nicht. Sie startet mit dem Config-Entry, lauscht auf `0.0.0.0` (Standardport `8765`, änderbar unter Optionen) und erscheint für Admins als Seitenleisten-Eintrag **People Pointer**; auf der Integrationsseite führen **Konfigurieren** bzw. der Link am Gerät "UniFi People Pointer" dorthin. Sie bietet Übersicht, Personen, Geräte, unbekannte Clients (beanspruchen) und Access Points. Jede API-Anfrage braucht ein HA-Token (im Panel automatisch, direkt aufgerufen ein Long-Lived Token), Änderungen nur als Admin. Details: [docs/installation.md](docs/installation.md#web-ui).
 
 #### 📋 Anforderungen
 
@@ -171,7 +164,8 @@ UniFi People Pointer is an advanced Home Assistant integration that tracks peopl
 - **Smart Events**: Automatic notifications for arrivals/departures
 - **Unknown Devices**: Alerts for new devices on the network
 - **HACS**: Install via custom repository (not yet in the HACS default store)
-- **Web UI**: Optional web interface for management (in development)
+- **Access points**: Trackers show the AP a device is connected to, e.g. `iPhone-SKHL AP: EG-Diele`
+- **Web UI**: Installed with the integration, sidebar entry "People Pointer"
 
 #### 🚀 Installation
 
@@ -275,21 +269,13 @@ Manual edits to `people.json` / `devices.json` are picked up on the next poll (n
 - `unifi_people_pointer_device_connected` - Device connected
 - `unifi_people_pointer_unknown_device` - Unknown device detected
 
-#### 🔧 Web UI (Optional)
+#### 📶 Access point names
 
-The project includes an optional web interface for easier management:
+While a device is connected its tracker is named `<name> AP: <AP name>` (e.g. `iPhone-SKHL AP: EG-Diele`); person trackers show the AP of their first connected device. The AP name comes from the UniFi device list and follows roaming on the next poll. The `ap_name` attribute is also set (trackers, and per client in the unknown/guest sensors). Entity ids do not change; a custom name set in HA replaces the suffix.
 
-```bash
-cd backend
-npm install
-npm run dev
-```
+#### 🔧 Web UI
 
-The interface runs on `http://localhost:3000` and offers:
-- People & Device Management
-- Zone Configuration (Access Points)
-- OUI Database Management
-- Live UniFi Client Monitoring
+The web UI ships with the integration; there is nothing extra to install. It starts with the config entry, listens on `0.0.0.0` (default port `8765`, configurable in the options) and shows up for admins as the sidebar entry **People Pointer**; on the integration page **Configure** and the link on the "UniFi People Pointer" device lead there. It offers an overview, persons, devices, unknown clients (claim) and access points. Every API request needs a Home Assistant token (handed over automatically inside the panel, a long-lived token when opened directly); changes require an admin. Details: [docs/installation.md](docs/installation.md#web-ui-1).
 
 #### 📋 Requirements
 

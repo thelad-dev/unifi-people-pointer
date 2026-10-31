@@ -56,3 +56,6 @@ home-assistant_v2.db
 .devcontainer/
 *.log
 .lint-venv/
+
+# Node (web UI sources in frontend/; the built bundle is committed)
+node_modules/

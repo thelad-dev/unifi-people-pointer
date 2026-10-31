@@ -37,7 +37,8 @@
         "title": "UniFi People Pointer Optionen",
         "description": "Konfiguriere Polling und Event Einstellungen",
         "data": {
-          "scan_interval": "Scan-Intervall (Sekunden)"
+          "scan_interval": "Scan-Intervall (Sekunden)",
+          "webui_port": "Port der Web-UI (lauscht auf allen Schnittstellen)"
         }
       }
     }

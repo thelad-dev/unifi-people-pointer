@@ -37,6 +37,38 @@ def auto_enable_custom_integrations(enable_custom_integrations):
     yield
 
 
+@pytest.fixture(autouse=True)
+def no_unifi_network_side_calls(request):
+    """Keep setup tests offline: no AP device list fetch, no web UI socket.
+
+    Tests that exercise these paths mark themselves with ``real_webui`` /
+    ``real_ap_fetch``.
+    """
+    from unittest.mock import patch
+
+    patches = []
+    if "real_ap_fetch" not in request.keywords:
+        patches.append(
+            patch(
+                "custom_components.unifi_people_pointer.coordinator."
+                "UniFiPeoplePointerCoordinator._fetch_access_points",
+                AsyncMock(return_value={}),
+            )
+        )
+    if "real_webui" not in request.keywords:
+        patches.append(
+            patch(
+                "custom_components.unifi_people_pointer.webui.WebUIServer.async_start",
+                AsyncMock(return_value=False),
+            )
+        )
+    for item in patches:
+        item.start()
+    yield
+    for item in patches:
+        item.stop()
+
+
 @pytest.fixture
 def mock_config_entry():
     """Return a mock config entry."""
