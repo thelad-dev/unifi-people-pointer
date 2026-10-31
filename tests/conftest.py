@@ -38,6 +38,24 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 
 
 @pytest.fixture(autouse=True)
+def threaded_dns_resolver():
+    """Resolve names with aiohttp's threaded resolver in tests.
+
+    The default aiodns resolver starts a pycares ``_run_safe_shutdown_loop``
+    thread that the Home Assistant harness reports as a leaked thread at
+    teardown, failing whichever test first opens an aiohttp session. Network
+    access in these tests is mocked or loopback, so the resolver choice does
+    not change what they verify.
+    """
+    from unittest.mock import patch
+
+    import aiohttp
+
+    with patch("aiohttp.connector.DefaultResolver", aiohttp.ThreadedResolver):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def no_unifi_network_side_calls(request):
     """Keep setup tests offline: no AP device list fetch, no web UI socket.
 
