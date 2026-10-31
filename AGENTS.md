@@ -6,7 +6,7 @@
 
 ## Current Implementation Status
 
-### ✅ Phase 3 wired: entities + UniFi presence (v1.2.0)
+### ✅ Phase 3 wired: entities + UniFi presence (v1.3.0)
 
 **What's Implemented:**
 
@@ -86,6 +86,9 @@ custom_components/unifi_people_pointer/
 ├── config_flow.py           # User/options/reauth config flow + API validation
 ├── coordinator.py           # UniFi poll + presence computation
 ├── events.py                # Event system + debouncer
+├── webui.py                 # Bundled web UI server (0.0.0.0, admin-token API) + panel registration
+├── panel/                   # Sidebar panel JS (iframe to the web UI)
+├── webui/                   # Built React bundle, committed (sources: repo-root frontend/)
 ├── services.py              # Service handlers + schemas
 ├── services.yaml            # Service definitions (UI metadata)
 ├── strings.json             # Base UI strings
@@ -211,7 +214,7 @@ This implementation follows the scout report through Phase 3 entity/presence wir
 - Tested: 2024.1+
 
 ### Platform Support
-- Currently: `device_tracker`, `sensor`
+- Currently: `device_tracker`, `sensor` (plus the bundled web UI, see `webui.py`)
 
 ## Code Style & Conventions
 
