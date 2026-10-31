@@ -158,7 +158,12 @@ async def test_unknown_sensor_lists_ap_name(hass, devices_data, people_data):
         }
     ]
     await _setup(hass, devices_data, people_data, clients)
-    sensor = hass.states.get("sensor.unknown_wifi_clients")
+    # The entity id gains a device-name prefix on newer HA once the sensor
+    # sits on a device, so resolve it through its stable unique id.
+    entity_id = er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"{DOMAIN}_unknown_clients"
+    )
+    sensor = hass.states.get(entity_id)
     assert sensor.attributes["clients"][0]["ap_name"] == "OG-Flur"
     assert sensor.attributes["clients"][0]["ap_mac"] == "24:5a:4c:aa:bb:dd"
 
@@ -179,12 +184,15 @@ async def test_access_point_counts_merge_by_device_identity(
     }
 
     def client(n, ap):
-        return {
+        # Classic clients carry the AP MAC, integration API clients carry
+        # ``uplinkDeviceId``; the raw payload is what the coordinator parses.
+        entry = {
             "mac": f"aa:aa:aa:00:00:0{n}",
             "hostname": f"c{n}",
             "is_wired": False,
-            "ap_mac": ap,
         }
+        entry["ap_mac" if ":" in ap else "uplinkDeviceId"] = ap
+        return entry
 
     clients = [
         client(1, "6a1b-uuid"),

@@ -53,6 +53,8 @@ class UniFiUnknownClientsSensor(
     """Sensor for unknown WiFi clients."""
 
     _attr_name = "Unknown WiFi Clients"
+    # Fixed object id: device_info would otherwise prefix the device name.
+    internal_integration_suggested_object_id = "unknown_wifi_clients"
     _attr_unique_id = f"{DOMAIN}_unknown_clients"
 
     def __init__(self, coordinator: UniFiPeoplePointerCoordinator) -> None:
@@ -159,6 +161,7 @@ class UniFiGuestClientsSensor(
     """Sensor for guest WiFi clients."""
 
     _attr_name = "Guest WiFi Clients"
+    internal_integration_suggested_object_id = "guest_wifi_clients"
     _attr_unique_id = f"{DOMAIN}_guest_clients"
 
     def __init__(self, coordinator: UniFiPeoplePointerCoordinator) -> None:
