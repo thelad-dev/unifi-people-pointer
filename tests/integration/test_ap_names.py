@@ -13,6 +13,7 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.unifi_people_pointer.api_parser import (
+    parse_access_point_ids,
     parse_access_point_names,
     parse_clients,
 )
@@ -162,37 +163,45 @@ async def test_unknown_sensor_lists_ap_name(hass, devices_data, people_data):
     assert sensor.attributes["clients"][0]["ap_mac"] == "24:5a:4c:aa:bb:dd"
 
 
-async def test_access_point_counts_merge_mac_and_device_id_clients(
+async def test_access_point_counts_merge_by_device_identity(
     hass, devices_data, people_data
 ):
-    """Clients referencing an AP by integration device id count on its MAC row."""
-    clients = [
-        {
-            "mac": "aa:aa:aa:00:00:01",
-            "hostname": "by-id",
-            "is_wired": False,
-            "ap_mac": "6a1b-uuid",
-        },
-        {
-            "mac": "aa:aa:aa:00:00:02",
-            "hostname": "by-mac",
-            "is_wired": False,
-            "ap_mac": "24:5a:4c:aa:bb:dd",
-        },
-        {
-            "mac": "aa:aa:aa:00:00:03",
-            "hostname": "other",
-            "is_wired": False,
-            "ap_mac": "24:5a:4c:aa:bb:cc",
-        },
+    """Device-id clients count on their AP's MAC row; same-named APs stay apart."""
+    raw_devices = [
+        {"id": "6A1B-UUID", "macAddress": "24:5a:4c:aa:bb:dd", "name": "OG-Flur"},
+        {"id": "7C2D-UUID", "macAddress": "24:5a:4c:aa:bb:ee", "name": "OG-Flur"},
+        {"id": "8E3F-UUID", "macAddress": "24:5a:4c:aa:bb:cc", "name": "EG-Diele"},
     ]
-    ap_names = {**AP_NAMES, "6a1b-uuid": "OG-Flur"}
-    await _setup(hass, devices_data, people_data, clients, ap_names=ap_names)
-    rows = hass.data[DOMAIN]["coordinator"].get_access_points()
-    assert {r["name"]: (r["mac"], r["clients"]) for r in rows} == {
-        "EG-Diele": ("24:5a:4c:aa:bb:cc", 1),
-        "OG-Flur": ("24:5a:4c:aa:bb:dd", 2),
+    assert parse_access_point_ids(raw_devices) == {
+        "6a1b-uuid": "24:5a:4c:aa:bb:dd",
+        "7c2d-uuid": "24:5a:4c:aa:bb:ee",
+        "8e3f-uuid": "24:5a:4c:aa:bb:cc",
     }
+
+    def client(n, ap):
+        return {
+            "mac": f"aa:aa:aa:00:00:0{n}",
+            "hostname": f"c{n}",
+            "is_wired": False,
+            "ap_mac": ap,
+        }
+
+    clients = [
+        client(1, "6a1b-uuid"),
+        client(2, "24:5a:4c:aa:bb:dd"),
+        client(3, "7c2d-uuid"),
+        client(4, "24:5a:4c:aa:bb:cc"),
+    ]
+    await _setup(hass, devices_data, people_data, clients, ap_names={})
+    coordinator = hass.data[DOMAIN]["coordinator"]
+    coordinator._ap_names = parse_access_point_names(raw_devices)
+    coordinator._ap_id_macs = parse_access_point_ids(raw_devices)
+    rows = coordinator.get_access_points()
+    assert sorted((r["name"], r["mac"], r["clients"]) for r in rows) == [
+        ("EG-Diele", "24:5a:4c:aa:bb:cc", 1),
+        ("OG-Flur", "24:5a:4c:aa:bb:dd", 2),
+        ("OG-Flur", "24:5a:4c:aa:bb:ee", 1),
+    ]
 
 
 async def test_last_uplink_name_is_fallback(hass, devices_data, people_data):

@@ -139,6 +139,24 @@ def parse_access_point_names(
     return names
 
 
+def parse_access_point_ids(
+    raw_devices: list[dict[str, Any]] | None,
+) -> dict[str, str]:
+    """Map integration API device ids (lower-case) to the MAC of the same device."""
+    ids: dict[str, str] = {}
+    for device in raw_devices or []:
+        if not isinstance(device, dict):
+            continue
+        mac_raw = device.get("mac") or device.get("macAddress")
+        device_id = device.get("id") or device.get("_id")
+        if not mac_raw or not device_id:
+            continue
+        mac = normalize_mac(str(mac_raw))
+        if mac:
+            ids[str(device_id).lower()] = mac
+    return ids
+
+
 def filter_wireless_only(clients: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Filter to only wireless clients."""
     return [c for c in clients if not c.get("is_wired")]

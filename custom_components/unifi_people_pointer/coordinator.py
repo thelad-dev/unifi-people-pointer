@@ -19,6 +19,7 @@ from .api_parser import (
     deduplicate_clients,
     filter_wireless_only,
     normalize_mac,
+    parse_access_point_ids,
     parse_access_point_names,
     parse_clients,
 )
@@ -112,6 +113,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # UniFi device name by normalized AP MAC (and by device id for the
         # integration API, whose clients reference ``uplinkDeviceId``).
         self._ap_names: dict[str, str] = {}
+        self._ap_id_macs: dict[str, str] = {}
         self._ap_names_fetched_at: float = 0.0
         # AP keys seen at the last fetch that UniFi did not name (no re-fetch
         # loop for nameless APs).
@@ -495,6 +497,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if isinstance(payload, dict) and isinstance(payload.get("data"), list):
                     names = parse_access_point_names(payload["data"])
                     if names:
+                        self._ap_id_macs = parse_access_point_ids(payload["data"])
                         return names
 
             if not self._site_id:
@@ -516,7 +519,9 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                 payload = await response.json(content_type=None)
             rows = payload.get("data") if isinstance(payload, dict) else payload
-            return parse_access_point_names(rows if isinstance(rows, list) else [])
+            rows = rows if isinstance(rows, list) else []
+            self._ap_id_macs = parse_access_point_ids(rows)
+            return parse_access_point_names(rows)
 
     def get_ap_name(self, ap_mac: str | None) -> str | None:
         """Return the UniFi device name for an AP MAC (or integration device id)."""
@@ -1061,25 +1066,25 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def get_access_points(self) -> list[dict[str, Any]]:
         """Access points known from UniFi with their current wireless clients."""
-        mac_by_name: dict[str, str] = {}
-        for key, name in self._ap_names.items():
-            if ":" in key:
-                mac_by_name.setdefault(name, key)
         counts: dict[str, int] = {}
         for client in filter_wireless_only(self._all_clients):
             key = client.get("ap_mac")
             if not key:
                 continue
-            name = self.get_ap_name(str(key))
-            row_key = mac_by_name.get(name, str(key)) if name else str(key)
+            key = str(key)
+            row_key = key if ":" in key else self._ap_id_macs.get(key.lower(), key)
             counts[row_key] = counts.get(row_key, 0) + 1
         rows: dict[str, dict[str, Any]] = {}
-        for name, mac in mac_by_name.items():
-            rows[mac] = {"mac": mac, "name": name, "clients": counts.get(mac, 0)}
+        for key, name in self._ap_names.items():
+            if ":" in key:
+                rows[key] = {"mac": key, "name": name, "clients": counts.get(key, 0)}
         for key, count in counts.items():
-            if key in rows:
-                continue
-            rows[key] = {"mac": key, "name": self.get_ap_name(key), "clients": count}
+            if key not in rows:
+                rows[key] = {
+                    "mac": key,
+                    "name": self.get_ap_name(key),
+                    "clients": count,
+                }
         return sorted(rows.values(), key=lambda r: (r["name"] or r["mac"]).lower())
 
     async def force_update_person(self, person: str) -> None:
