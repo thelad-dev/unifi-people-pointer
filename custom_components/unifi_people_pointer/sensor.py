@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -27,10 +28,20 @@ async def async_setup_entry(
     runtime = hass.data[DOMAIN][entry.entry_id]
     coordinator: UniFiPeoplePointerCoordinator = runtime["coordinator"]
 
+    # Service device on the integration page; its link opens the web UI.
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name="UniFi People Pointer",
+        manufacturer="UniFi People Pointer",
+        entry_type=DeviceEntryType.SERVICE,
+        configuration_url=runtime.get("webui_url"),
+    )
     entities = [
         UniFiUnknownClientsSensor(coordinator),
         UniFiGuestClientsSensor(coordinator),
     ]
+    for entity in entities:
+        entity._attr_device_info = device_info
 
     async_add_entities(entities)
     _LOGGER.info("Added %d sensor entities", len(entities))
@@ -42,6 +53,8 @@ class UniFiUnknownClientsSensor(
     """Sensor for unknown WiFi clients."""
 
     _attr_name = "Unknown WiFi Clients"
+    # Fixed object id: device_info would otherwise prefix the device name.
+    internal_integration_suggested_object_id = "unknown_wifi_clients"
     _attr_unique_id = f"{DOMAIN}_unknown_clients"
 
     def __init__(self, coordinator: UniFiPeoplePointerCoordinator) -> None:
@@ -80,6 +93,7 @@ class UniFiUnknownClientsSensor(
                     "signal_strength": client.get("signal")
                     or client.get("signal_strength"),
                     "ap_mac": client.get("ap_mac"),
+                    "ap_name": self.coordinator.get_client_ap_name(client),
                 }
                 for client in self._unknown_clients
             ]
@@ -147,6 +161,7 @@ class UniFiGuestClientsSensor(
     """Sensor for guest WiFi clients."""
 
     _attr_name = "Guest WiFi Clients"
+    internal_integration_suggested_object_id = "guest_wifi_clients"
     _attr_unique_id = f"{DOMAIN}_guest_clients"
 
     def __init__(self, coordinator: UniFiPeoplePointerCoordinator) -> None:
@@ -177,6 +192,7 @@ class UniFiGuestClientsSensor(
                     "signal_strength": client.get("signal")
                     or client.get("signal_strength"),
                     "ap_mac": client.get("ap_mac"),
+                    "ap_name": self.coordinator.get_client_ap_name(client),
                 }
                 for client in self._guest_clients
             ]

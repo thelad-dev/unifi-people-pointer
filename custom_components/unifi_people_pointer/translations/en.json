@@ -37,9 +37,16 @@
         "title": "UniFi People Pointer Options",
         "description": "Configure polling and event settings",
         "data": {
-          "scan_interval": "Scan interval (seconds)"
+          "scan_interval": "Scan interval (seconds)",
+          "webui_port": "Web UI port (served on all interfaces)"
         }
       }
+    }
+  },
+  "issues": {
+    "webui_port_unavailable": {
+      "title": "Web UI port {port} is not available",
+      "description": "The UniFi People Pointer web UI could not listen on port {port}, usually because another service uses it. Presence tracking keeps working. Pick a free port under Settings > Devices & services > UniFi People Pointer > Configure."
     }
   }
 }

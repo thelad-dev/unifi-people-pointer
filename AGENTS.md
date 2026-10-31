@@ -6,7 +6,7 @@
 
 ## Current Implementation Status
 
-### ✅ Phase 3 wired: entities + UniFi presence (v1.2.0)
+### ✅ Phase 3 wired: entities + UniFi presence (v1.3.0)
 
 **What's Implemented:**
 
@@ -37,14 +37,13 @@
 - Form schema keys: `host`, `api_token`, `verify_ssl`
 - Entry data keys: `CONF_HOST`, `CONF_TOKEN` (`token`), `verify_ssl` — form `api_token` is mapped to `CONF_TOKEN` on create
 - `validate_api_connection` hits `GET /proxy/network/integration/v1/sites` with `X-API-KEY`
-- Options flow updates `scan_interval`; reauth step is `reauth_confirm`
+- Options flow updates `scan_interval` and `webui_port`; reauth step is `reauth_confirm`
 - No `NotImplementedError` on config/setup path (avoids HA HTTP 500 when adding the integration)
 
 **Still limited / later:**
 
 - Mobile-app and ping fallbacks not fully wired
 - OUI database update and file watcher are incomplete
-- Optional Node/React backend remains separate from the HA integration path
 
 ## Architecture Decisions
 
@@ -87,6 +86,9 @@ custom_components/unifi_people_pointer/
 ├── config_flow.py           # User/options/reauth config flow + API validation
 ├── coordinator.py           # UniFi poll + presence computation
 ├── events.py                # Event system + debouncer
+├── webui.py                 # Bundled web UI server (0.0.0.0, admin-token API) + panel registration
+├── panel/                   # Sidebar panel JS (iframe to the web UI)
+├── webui/                   # Built React bundle, committed (sources: repo-root frontend/)
 ├── services.py              # Service handlers + schemas
 ├── services.yaml            # Service definitions (UI metadata)
 ├── strings.json             # Base UI strings
@@ -164,9 +166,7 @@ When testing this integration:
 - AP zone mapping polish
 
 ### Phase 5: Web UI
-- React frontend
-- Node.js backend
-- Docker deployment
+- Shipped inside the integration (see `webui.py`, `frontend/`); no Node backend or Docker
 
 ## Common Issues & Solutions
 
@@ -214,7 +214,7 @@ This implementation follows the scout report through Phase 3 entity/presence wir
 - Tested: 2024.1+
 
 ### Platform Support
-- Currently: `device_tracker`, `sensor`
+- Currently: `device_tracker`, `sensor` (plus the bundled web UI, see `webui.py`)
 
 ## Code Style & Conventions
 
