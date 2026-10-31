@@ -17,6 +17,7 @@ CONF_EVENT_DEBOUNCE = "event_debounce"
 CONF_ENABLE_OUI_UPDATE = "enable_oui_update"
 CONF_OUI_UPDATE_INTERVAL = "oui_update_interval"
 CONF_OUI_SOURCE = "oui_source"
+CONF_WEBUI_PORT = "webui_port"
 
 # Default Values
 DEFAULT_SITE_ID = "default"
@@ -29,6 +30,19 @@ DEFAULT_EVENT_DEBOUNCE = 180  # 3 minutes
 DEFAULT_ENABLE_OUI_UPDATE = True
 DEFAULT_OUI_UPDATE_INTERVAL = "monthly"
 DEFAULT_OUI_SOURCE = "https://standards-oui.ieee.org/oui/oui.txt"
+
+DEFAULT_WEBUI_PORT = 8765
+
+# Web UI (bundled, served by the integration on all interfaces)
+WEBUI_BIND_HOST = "0.0.0.0"  # nosec B104 - LAN UI, API requires an HA token
+MIN_WEBUI_PORT = 1024
+MAX_WEBUI_PORT = 65535
+PANEL_URL_PATH = "unifi-people-pointer"
+PANEL_ELEMENT = "unifi-people-pointer-panel"
+PANEL_TITLE = "People Pointer"
+PANEL_ICON = "mdi:account-search"
+PANEL_STATIC_URL = "/unifi_people_pointer_static/upp-panel.js"
+ISSUE_WEBUI_PORT = "webui_port_unavailable"
 
 # Min/Max Values
 MIN_POLL_INTERVAL = 10
@@ -77,6 +91,10 @@ DEVICES_FILE = "devices.json"
 AP_ZONES_FILE = "ap_zones.json"
 MANUFACTURERS_FILE = "manufacturers.json"
 OUI_VENDORS_FILE = "oui_vendors.json"
+
+# AP names: re-fetch the UniFi device list at least this often (seconds),
+# and immediately when a client reports an AP that is not in the map yet.
+AP_NAMES_REFRESH_SECONDS = 600
 
 # Auto-dismiss
 AUTO_DISMISS_DAYS = 7

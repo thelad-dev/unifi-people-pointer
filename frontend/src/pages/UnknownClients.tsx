@@ -1,126 +1,76 @@
-import { useEffect, useState } from 'react';
-import api from '../api';
+import { useState } from 'react';
+import api, { errorText, Person, UnknownClient } from '../api';
+import { useApi } from '../useApi';
 
-interface Client {
-  mac: string;
-  hostname?: string;
-  vendor?: string;
-  lastSeen: string;
-}
-
-interface Person {
-  id: string;
+interface Form {
+  person: string;
   name: string;
+  role: 'primary' | 'secondary';
 }
 
 function UnknownClients() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [persons, setPersons] = useState<Person[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [showAssociateModal, setShowAssociateModal] = useState(false);
-  const [selectedPersonId, setSelectedPersonId] = useState('');
+  const { data: clients, error, reload } = useApi<UnknownClient[]>('/clients/unknown');
+  const { data: persons } = useApi<Person[]>('/persons');
+  const [selected, setSelected] = useState<UnknownClient | null>(null);
+  const [form, setForm] = useState<Form>({ person: '', name: '', role: 'secondary' });
+  const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const [clientsRes, personsRes] = await Promise.all([
-        api.get('/clients/unknown'),
-        api.get('/persons'),
-      ]);
-      setClients(clientsRes.data);
-      setPersons(personsRes.data);
-    } catch (err) {
-      console.error('Failed to load unknown clients:', err);
-    } finally {
-      setLoading(false);
-    }
+  const open = (client: UnknownClient) => {
+    setSelected(client);
+    setForm({ person: '', name: client.hostname || '', role: 'secondary' });
+    setFormError(null);
   };
 
-  const handleIgnore = async (mac: string) => {
-    try {
-      await api.post(`/clients/${mac}/ignore`);
-      fetchData();
-    } catch (err) {
-      console.error('Failed to ignore client:', err);
-    }
-  };
-
-  const handleAssociate = (client: Client) => {
-    setSelectedClient(client);
-    setSelectedPersonId('');
-    setShowAssociateModal(true);
-  };
-
-  const handleAssociateSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClient) return;
-
+    if (!selected) return;
     try {
-      await api.post(`/clients/${selectedClient.mac}/associate`, {
-        personId: selectedPersonId,
-      });
-      setShowAssociateModal(false);
-      fetchData();
+      await api.post(`/clients/${encodeURIComponent(selected.mac)}/claim`, form);
+      setSelected(null);
+      reload();
     } catch (err) {
-      console.error('Failed to associate client:', err);
+      setFormError(errorText(err));
     }
   };
 
-  const lookupOui = async (mac: string) => {
-    try {
-      const res = await api.get(`/oui/lookup/${mac}`);
-      return res.data.vendor || 'Unknown';
-    } catch (err) {
-      return 'Unknown';
-    }
-  };
-
-  if (loading) {
-    return <div className="loading">Loading unknown clients...</div>;
-  }
+  if (error && !clients) return <div className="error">{error}</div>;
+  if (!clients) return <div className="loading">Loading unknown clients...</div>;
 
   return (
     <div>
       <div className="page-header">
         <h2>Unknown Clients</h2>
-        <p>Review and classify unknown devices on your network</p>
+        <p>Wireless clients that match no configured device; claim one to assign it to a person</p>
       </div>
 
       {clients.length === 0 ? (
         <div className="empty-state">
           <h3>No unknown clients</h3>
-          <p>All detected clients have been classified</p>
+          <p>Every wireless client matches a configured device.</p>
         </div>
       ) : (
-        <div className="card">
+        <div className="card table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th>MAC Address</th>
                 <th>Hostname</th>
-                <th>Vendor</th>
-                <th>Last Seen</th>
-                <th>Actions</th>
+                <th>MAC address</th>
+                <th>IP</th>
+                <th>Access point</th>
+                <th>Signal</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {clients.map(client => (
-                <tr key={client.mac}>
-                  <td><code>{client.mac}</code></td>
-                  <td>{client.hostname || '-'}</td>
-                  <td>{client.vendor || 'Unknown'}</td>
-                  <td>{new Date(client.lastSeen).toLocaleString()}</td>
+              {clients.map((c) => (
+                <tr key={c.mac}>
+                  <td>{c.hostname || <span className="muted">-</span>}</td>
+                  <td><code>{c.mac}</code></td>
+                  <td>{c.ip || '-'}</td>
+                  <td>{c.ap_name || c.ap_mac || '-'}</td>
+                  <td>{c.signal != null ? `${c.signal} dBm` : '-'}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button onClick={() => handleAssociate(client)}>Associate</button>
-                      <button className="button-secondary" onClick={() => handleIgnore(client.mac)}>
-                        Ignore
-                      </button>
-                    </div>
+                    <button onClick={() => open(c)} disabled={!persons?.length}>Claim</button>
                   </td>
                 </tr>
               ))}
@@ -129,30 +79,36 @@ function UnknownClients() {
         </div>
       )}
 
-      {showAssociateModal && selectedClient && (
-        <div className="modal-overlay" onClick={() => setShowAssociateModal(false)}>
+      {selected && (
+        <div className="modal-overlay" onClick={() => setSelected(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Associate Client</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              MAC: <code>{selectedClient.mac}</code>
-            </p>
-            <form onSubmit={handleAssociateSubmit}>
+            <h3>Claim client</h3>
+            <p className="muted">MAC <code>{selected.mac}</code></p>
+            {formError && <div className="error">{formError}</div>}
+            <form onSubmit={submit}>
               <div className="form-group">
-                <label>Assign to Person</label>
-                <select
-                  value={selectedPersonId}
-                  onChange={(e) => setSelectedPersonId(e.target.value)}
-                  required
-                >
+                <label>Person</label>
+                <select value={form.person} onChange={(e) => setForm({ ...form, person: e.target.value })} required>
                   <option value="">Select a person</option>
-                  {persons.map(person => (
-                    <option key={person.id} value={person.id}>{person.name}</option>
+                  {(persons || []).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               </div>
+              <div className="form-group">
+                <label>Device name</label>
+                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Role</label>
+                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Form['role'] })}>
+                  <option value="primary">Primary device</option>
+                  <option value="secondary">Secondary device</option>
+                </select>
+              </div>
               <div className="button-group">
-                <button type="submit">Associate</button>
-                <button type="button" className="button-secondary" onClick={() => setShowAssociateModal(false)}>
+                <button type="submit">Claim</button>
+                <button type="button" className="button-secondary" onClick={() => setSelected(null)}>
                   Cancel
                 </button>
               </div>

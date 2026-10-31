@@ -48,56 +48,19 @@ Users can add custom repository:
 3. Category: Integration
 4. Click + and search "UniFi People Pointer"
 
-## Webapp Deployment Ready ✅
+## Web UI
 
-Backend API is ready for deployment:
+The web UI is part of the integration: the React sources live in `frontend/`, the built bundle is committed under `custom_components/unifi_people_pointer/webui/` and served by the integration on `0.0.0.0` (default port 8765) together with its JSON API. There is no separate backend or Docker deployment any more.
 
-### Docker Deployment
-
-```bash
-# 1. Create .env file
-cd backend
-cp .env.example .env
-# Edit .env with your settings
-
-# 2. Build and run
-cd ..
-docker-compose up -d
-
-# 3. Access
-# API: http://localhost:3000
-# Health: http://localhost:3000/health
-```
-
-### Manual Deployment
+After changing `frontend/`, rebuild and commit the bundle:
 
 ```bash
-# 1. Install dependencies
-cd backend
-npm install
-
-# 2. Build
+cd frontend
+npm ci
 npm run build
-
-# 3. Configure
-cp .env.example .env
-# Edit .env
-
-# 4. Run
-npm start
 ```
 
-### Environment Variables
-
-Required:
-- `HA_URL` - Home Assistant URL
-- `HA_TOKEN` - Long-lived access token
-- `UNIFI_URL` - UniFi Controller URL
-- `UNIFI_API_KEY` - UniFi API key
-
-Optional:
-- `PORT` - Server port (default: 3000)
-- `NODE_ENV` - Environment (production/development)
+CI rebuilds the bundle and fails when the committed copy does not match the sources. User-facing setup: [docs/installation.md](docs/installation.md#web-ui).
 
 ## Installation for Users
 
@@ -141,7 +104,6 @@ Optional:
 
 - Device Tracker platform implementation
 - Sensor platform with metrics
-- Frontend UI (React/Vue)
 - Extended zone support
 - Bluetooth fallback
 

@@ -21,6 +21,38 @@ from .presence import person_owns_device
 
 _LOGGER = logging.getLogger(__name__)
 
+AP_NAME_SEPARATOR = " AP: "
+
+
+def name_with_ap(base_name: str | None, ap_name: str | None) -> str | None:
+    """Return ``"<name> AP: <ap>"`` while an AP is known, else the base name."""
+    if not ap_name or not base_name:
+        return base_name
+    return f"{base_name}{AP_NAME_SEPARATOR}{ap_name}"
+
+
+class _APNameMixin:
+    """Show the current access point in the entity name.
+
+    The registry object id keeps coming from the base name, so the AP
+    suffix never leaks into entity ids of newly registered entities.
+    """
+
+    _attr_name: str | None
+
+    def _current_ap_name(self) -> str | None:
+        raise NotImplementedError
+
+    @property
+    def name(self) -> str | None:
+        """Return the base name plus the current access point."""
+        return name_with_ap(self._attr_name, self._current_ap_name())
+
+    @property
+    def suggested_object_id(self) -> str | None:
+        """Build the entity id from the base name only."""
+        return self._attr_name
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -116,7 +148,7 @@ async def async_setup_entry(
 
 
 class UniFiPersonTracker(
-    CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity
+    _APNameMixin, CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity
 ):
     """Representation of a UniFi Person Tracker."""
 
@@ -133,6 +165,10 @@ class UniFiPersonTracker(
         self._attr_name = person_data["name"]
         self._ha_person = person_data.get("ha_person")
         self._attr_unique_id = f"{DOMAIN}_person_{self._person_id}"
+
+    def _current_ap_name(self) -> str | None:
+        """AP of the person's first online device while at home."""
+        return self.coordinator.get_person_ap_name(self._person_id)
 
     @property
     def source_type(self) -> SourceType:
@@ -182,6 +218,7 @@ class UniFiPersonTracker(
             ],
             "devices_online": presence.get("devices_online", 0),
             "online_device_ids": presence.get("online_device_ids", []),
+            "ap_name": self._current_ap_name(),
             "source": "unifi_people_pointer",
         }
 
@@ -233,7 +270,7 @@ class UniFiPersonTracker(
 
 
 class UniFiDeviceTracker(
-    CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity
+    _APNameMixin, CoordinatorEntity[UniFiPeoplePointerCoordinator], TrackerEntity
 ):
     """Representation of a UniFi Device Tracker."""
 
@@ -255,6 +292,12 @@ class UniFiDeviceTracker(
             else self._setup_mac.replace(":", "").lower()
         )
         self._attr_unique_id = f"{DOMAIN}_device_{uid_key}"
+
+    def _current_ap_name(self) -> str | None:
+        """AP the device is connected to (None while away)."""
+        if not self._is_connected():
+            return None
+        return self.coordinator.get_device_ap_name(self._current_mac())
 
     def _current_device(self) -> dict[str, Any] | None:
         """Return the live devices.json record for this tracker."""
@@ -339,6 +382,7 @@ class UniFiDeviceTracker(
             "hostname": client.get("hostname"),
             "signal_strength": client.get("signal") or client.get("signal_strength"),
             "ap_mac": client.get("ap_mac"),
+            "ap_name": self._current_ap_name(),
             "last_seen": last_seen_iso,
             "person": self._current_person(),
             "device_type": device.get("type"),

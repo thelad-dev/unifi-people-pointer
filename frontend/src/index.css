@@ -6,6 +6,8 @@
 
 :root {
   --primary-color: #50533C;
+  /* Readable olive tone for text and accents on the dark background. */
+  --accent: #c8cc9f;
   --primary-dark: #3a3d2a;
   --primary-light: #6b6f54;
   --background: #1a1a1a;
