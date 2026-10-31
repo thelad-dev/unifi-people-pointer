@@ -1061,23 +1061,25 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def get_access_points(self) -> list[dict[str, Any]]:
         """Access points known from UniFi with their current wireless clients."""
+        mac_by_name: dict[str, str] = {}
+        for key, name in self._ap_names.items():
+            if ":" in key:
+                mac_by_name.setdefault(name, key)
         counts: dict[str, int] = {}
         for client in filter_wireless_only(self._all_clients):
             key = client.get("ap_mac")
-            if key:
-                counts[str(key)] = counts.get(str(key), 0) + 1
+            if not key:
+                continue
+            name = self.get_ap_name(str(key))
+            row_key = mac_by_name.get(name, str(key)) if name else str(key)
+            counts[row_key] = counts.get(row_key, 0) + 1
         rows: dict[str, dict[str, Any]] = {}
-        for key, name in self._ap_names.items():
-            if ":" not in key:
-                continue  # integration API device ids mirror the MAC rows
-            rows[key] = {"mac": key, "name": name, "clients": counts.get(key, 0)}
+        for name, mac in mac_by_name.items():
+            rows[mac] = {"mac": mac, "name": name, "clients": counts.get(mac, 0)}
         for key, count in counts.items():
             if key in rows:
                 continue
-            name = self.get_ap_name(key)
-            if name and any(r["name"] == name for r in rows.values()):
-                continue
-            rows[key] = {"mac": key, "name": name, "clients": count}
+            rows[key] = {"mac": key, "name": self.get_ap_name(key), "clients": count}
         return sorted(rows.values(), key=lambda r: (r["name"] or r["mac"]).lower())
 
     async def force_update_person(self, person: str) -> None:

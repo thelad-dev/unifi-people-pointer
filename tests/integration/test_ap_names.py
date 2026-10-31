@@ -162,6 +162,39 @@ async def test_unknown_sensor_lists_ap_name(hass, devices_data, people_data):
     assert sensor.attributes["clients"][0]["ap_mac"] == "24:5a:4c:aa:bb:dd"
 
 
+async def test_access_point_counts_merge_mac_and_device_id_clients(
+    hass, devices_data, people_data
+):
+    """Clients referencing an AP by integration device id count on its MAC row."""
+    clients = [
+        {
+            "mac": "aa:aa:aa:00:00:01",
+            "hostname": "by-id",
+            "is_wired": False,
+            "ap_mac": "6a1b-uuid",
+        },
+        {
+            "mac": "aa:aa:aa:00:00:02",
+            "hostname": "by-mac",
+            "is_wired": False,
+            "ap_mac": "24:5a:4c:aa:bb:dd",
+        },
+        {
+            "mac": "aa:aa:aa:00:00:03",
+            "hostname": "other",
+            "is_wired": False,
+            "ap_mac": "24:5a:4c:aa:bb:cc",
+        },
+    ]
+    ap_names = {**AP_NAMES, "6a1b-uuid": "OG-Flur"}
+    await _setup(hass, devices_data, people_data, clients, ap_names=ap_names)
+    rows = hass.data[DOMAIN]["coordinator"].get_access_points()
+    assert {r["name"]: (r["mac"], r["clients"]) for r in rows} == {
+        "EG-Diele": ("24:5a:4c:aa:bb:cc", 1),
+        "OG-Flur": ("24:5a:4c:aa:bb:dd", 2),
+    }
+
+
 async def test_last_uplink_name_is_fallback(hass, devices_data, people_data):
     """Without a device list entry the client's own uplink name is used."""
     clients = [
