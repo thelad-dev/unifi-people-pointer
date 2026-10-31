@@ -3,7 +3,7 @@
 The UI bundle (``webui/``) ships inside the integration, so a HACS install or a
 manual copy of ``custom_components/unifi_people_pointer`` is all it needs. The
 server binds on all interfaces at the configured port. Every ``/api`` request
-must carry a valid Home Assistant access token; changes need an admin user.
+must carry a valid Home Assistant access token of an admin user.
 """
 
 from __future__ import annotations
@@ -149,7 +149,8 @@ class WebUIServer:
         user = refresh_token.user if refresh_token is not None else None
         if user is None or not user.is_active:
             return web.json_response({"error": "unauthorized"}, status=401)
-        if request.method not in ("GET", "HEAD") and not user.is_admin:
+        # Same audience as the admin-only sidebar panel.
+        if not user.is_admin:
             return web.json_response({"error": "admin required"}, status=403)
         return await handler(request)
 
@@ -379,11 +380,11 @@ class WebUIServer:
         body = await self._json_body(request)
         name = self._text(body, "name", required=True)
         device_type = self._device_type(body)
+        person = self._text(body, "person")
+        if person and not self._person_exists(person):
+            raise web.HTTPBadRequest(text="unknown person")
         await self.coordinator.update_device(str(device["id"]), name, device_type)
         if "person" in body:
-            person = self._text(body, "person")
-            if person and not self._person_exists(person):
-                raise web.HTTPBadRequest(text="unknown person")
             if person:
                 await self.coordinator.assign_device(
                     str(device["mac"]), person, self._role(body), name
@@ -399,6 +400,8 @@ class WebUIServer:
 
     async def _claim_client(self, request: web.Request) -> web.Response:
         mac = normalize_mac(request.match_info["mac"])
+        if len(mac.split(":")) != 6:
+            raise web.HTTPBadRequest(text="mac must be a MAC address")
         body = await self._json_body(request)
         person = self._text(body, "person", required=True)
         if not self._person_exists(person):
@@ -461,7 +464,6 @@ async def async_register_panel(hass: HomeAssistant, port: int) -> None:
         module_url=f"{PANEL_STATIC_URL}?v={version}",
         config={"port": port},
         require_admin=True,
-        config_panel_domain=DOMAIN,
     )
 
 

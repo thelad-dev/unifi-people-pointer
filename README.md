@@ -130,7 +130,7 @@ Solange ein Gerät verbunden ist, heißt sein Tracker `<Name> AP: <AP-Name>` (z.
 
 #### 🔧 Web-UI
 
-Die Web-UI ist Teil der Integration, eine Zusatzinstallation gibt es nicht. Sie startet mit dem Config-Entry, lauscht auf `0.0.0.0` (Standardport `8765`, änderbar unter Optionen) und erscheint für Admins als Seitenleisten-Eintrag **People Pointer**; auf der Integrationsseite führen **Konfigurieren** bzw. der Link am Gerät "UniFi People Pointer" dorthin. Sie bietet Übersicht, Personen, Geräte, unbekannte Clients (beanspruchen) und Access Points. Jede API-Anfrage braucht ein HA-Token (im Panel automatisch, direkt aufgerufen ein Long-Lived Token), Änderungen nur als Admin. Details: [docs/installation.md](docs/installation.md#web-ui).
+Die Web-UI ist Teil der Integration, eine Zusatzinstallation gibt es nicht. Sie startet mit dem Config-Entry, lauscht auf `0.0.0.0` (Standardport `8765`, änderbar unter Optionen) und erscheint für Admins als Seitenleisten-Eintrag **People Pointer**; auf der Integrationsseite führt der Link **Besuchen** am Gerät "UniFi People Pointer" dorthin. Sie bietet Übersicht, Personen, Geräte, unbekannte Clients (beanspruchen) und Access Points. Jede API-Anfrage braucht das HA-Token eines Admins (im Panel automatisch, direkt aufgerufen ein Long-Lived Token). Ist der Port belegt, erscheint ein Hinweis unter Reparaturen. Details: [docs/installation.md](docs/installation.md#web-ui).
 
 #### 📋 Anforderungen
 
@@ -275,7 +275,7 @@ While a device is connected its tracker is named `<name> AP: <AP name>` (e.g. `i
 
 #### 🔧 Web UI
 
-The web UI ships with the integration; there is nothing extra to install. It starts with the config entry, listens on `0.0.0.0` (default port `8765`, configurable in the options) and shows up for admins as the sidebar entry **People Pointer**; on the integration page **Configure** and the link on the "UniFi People Pointer" device lead there. It offers an overview, persons, devices, unknown clients (claim) and access points. Every API request needs a Home Assistant token (handed over automatically inside the panel, a long-lived token when opened directly); changes require an admin. Details: [docs/installation.md](docs/installation.md#web-ui-1).
+The web UI ships with the integration; there is nothing extra to install. It starts with the config entry, listens on `0.0.0.0` (default port `8765`, configurable in the options) and shows up for admins as the sidebar entry **People Pointer**; on the integration page the **Visit** link on the "UniFi People Pointer" device leads there. It offers an overview, persons, devices, unknown clients (claim) and access points. Every API request needs an admin's Home Assistant token (handed over automatically inside the panel, a long-lived token when opened directly). If the port is taken, a repair issue says so. Details: [docs/installation.md](docs/installation.md#web-ui-1).
 
 #### 📋 Requirements
 

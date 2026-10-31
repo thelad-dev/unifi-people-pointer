@@ -64,10 +64,13 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(undefined, (error) => {
   if (error?.response?.status === 401) {
-    // Short-lived panel tokens expire; ask the panel for a fresh one.
-    panelToken = null;
-    requestPanelToken();
-    listeners.forEach((fn) => fn());
+    if (embedded) {
+      // Short-lived panel tokens expire; the panel answers with a fresh one
+      // and the next refresh succeeds without leaving the page.
+      requestPanelToken();
+    } else {
+      saveToken(null);
+    }
   }
   return Promise.reject(error);
 });

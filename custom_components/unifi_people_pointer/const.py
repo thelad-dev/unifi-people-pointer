@@ -42,6 +42,7 @@ PANEL_ELEMENT = "unifi-people-pointer-panel"
 PANEL_TITLE = "People Pointer"
 PANEL_ICON = "mdi:account-search"
 PANEL_STATIC_URL = "/unifi_people_pointer_static/upp-panel.js"
+ISSUE_WEBUI_PORT = "webui_port_unavailable"
 
 # Min/Max Values
 MIN_POLL_INTERVAL = 10

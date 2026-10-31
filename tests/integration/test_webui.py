@@ -86,10 +86,10 @@ async def test_api_requires_ha_token(client, hass_access_token):
     ).status == 200
 
 
-async def test_read_only_user_cannot_change(client, hass_read_only_access_token):
-    """Non-admin users can read but not write."""
+async def test_non_admin_user_is_rejected(client, hass_read_only_access_token):
+    """Like the admin-only panel, the API serves admins only."""
     headers = _auth(hass_read_only_access_token)
-    assert (await client.get("/api/persons", headers=headers)).status == 200
+    assert (await client.get("/api/persons", headers=headers)).status == 403
     resp = await client.post("/api/persons", headers=headers, json={"name": "Eve"})
     assert resp.status == 403
 
@@ -243,12 +243,18 @@ async def test_claim_unknown_client(hass, client, hass_access_token):
     assert resp.status == 400
 
 
-async def test_static_bundle_and_spa_fallback(client):
+async def test_static_bundle_and_spa_fallback(client, hass_access_token):
     """Bundle is served without auth; unknown paths fall back to index.html."""
     index = await client.get("/")
     assert index.status == 200
     assert '<div id="root">' in await index.text()
     assert (await client.get("/persons")).status == 200
+    bad_mac = await client.post(
+        "/api/clients/not-a-mac/claim",
+        headers=_auth(hass_access_token),
+        json={"person": "janine"},
+    )
+    assert bad_mac.status == 400
     traversal = await client.get("/..%2fmanifest.json")
     assert "unifi_people_pointer" not in await traversal.text()
     assert (await client.get("/api/nope", headers={})).status == 401
@@ -308,7 +314,8 @@ async def test_panel_registered_and_removed(hass, devices_data, people_data):
         assert panel.config["_panel_custom"]["module_url"].startswith(
             "/unifi_people_pointer_static/upp-panel.js?v="
         )
-        assert panel.config_panel_domain == DOMAIN
+        # No config panel domain: the integration keeps its options dialog.
+        assert panel.config_panel_domain is None
         assert panel.require_admin is True
         assert static_paths.await_count + legacy_static.call_count == 1
 
@@ -318,3 +325,73 @@ async def test_panel_registered_and_removed(hass, devices_data, people_data):
         assert await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
         assert PANEL_URL_PATH not in hass.data[frontend.DATA_PANELS]
+
+
+async def test_device_update_with_unknown_person_changes_nothing(
+    hass, client, hass_access_token
+):
+    """A rejected update leaves name and type untouched."""
+    headers = _auth(hass_access_token)
+    resp = await client.put(
+        "/api/devices/iphone-skhl",
+        headers=headers,
+        json={"name": "Renamed", "type": "tablet", "person": "ghost"},
+    )
+    assert resp.status == 400
+    devices = await (await client.get("/api/devices", headers=headers)).json()
+    phone = next(d for d in devices if d["id"] == "iphone-skhl")
+    assert (phone["name"], phone["type"]) == ("iPhone-SKHL", "smartphone")
+
+
+async def test_port_conflict_raises_repair_issue(hass, devices_data, people_data):
+    """A port that cannot be bound shows a repair issue; setup still succeeds."""
+    from homeassistant.helpers import issue_registry as ir
+
+    from custom_components.unifi_people_pointer.const import ISSUE_WEBUI_PORT
+
+    storage = Path(hass.config.path(STORAGE_DIR))
+    storage.mkdir(parents=True, exist_ok=True)
+    (storage / "devices.json").write_text(json.dumps(devices_data), encoding="utf-8")
+    (storage / "people.json").write_text(json.dumps(people_data), encoding="utf-8")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": "192.168.88.1", "token": "test-token", "verify_ssl": False},
+        unique_id="port-conflict",
+    )
+    entry.add_to_hass(hass)
+    with patch(f"{COORD}._fetch_clients", new=AsyncMock(return_value=[])):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, ISSUE_WEBUI_PORT)
+    assert issue is not None
+    assert issue.translation_placeholders == {"port": "8765"}
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert ir.async_get(hass).async_get_issue(DOMAIN, ISSUE_WEBUI_PORT) is None
+
+
+async def test_failed_setup_releases_web_ui(hass, devices_data, people_data):
+    """If setup fails after the server started, the server is stopped again."""
+    storage = Path(hass.config.path(STORAGE_DIR))
+    storage.mkdir(parents=True, exist_ok=True)
+    (storage / "devices.json").write_text(json.dumps(devices_data), encoding="utf-8")
+    (storage / "people.json").write_text(json.dumps(people_data), encoding="utf-8")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": "192.168.88.1", "token": "test-token", "verify_ssl": False},
+        unique_id="setup-fails",
+    )
+    entry.add_to_hass(hass)
+    stop = AsyncMock()
+    with patch(f"{COORD}._fetch_clients", new=AsyncMock(return_value=[])), patch(
+        "custom_components.unifi_people_pointer.webui.WebUIServer.async_start",
+        new=AsyncMock(return_value=True),
+    ), patch(
+        "custom_components.unifi_people_pointer.webui.WebUIServer.async_stop", new=stop
+    ), patch(
+        "custom_components.unifi_people_pointer.setup_services",
+        side_effect=RuntimeError("boom"),
+    ):
+        assert not await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    stop.assert_awaited_once()

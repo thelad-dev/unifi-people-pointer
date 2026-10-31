@@ -455,16 +455,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             names = await self._fetch_access_points()
         except Exception as err:  # noqa: BLE001
             _LOGGER.debug("UniFi device list for AP names failed: %s", err)
-            # Do not retry on every poll while the device list is unavailable.
-            self._ap_names_fetched_at = time.monotonic()
-            return
+            # Keep the previous names and wait for the regular refresh
+            # interval instead of retrying on every poll.
+            names = self._ap_names
         self._ap_names = names
         self._ap_names_fetched_at = time.monotonic()
-        self._ap_unresolved = {
-            key
-            for key in self._client_ap_keys(raw_clients)
-            if key not in names and key.lower() not in names
-        }
+        self._ap_unresolved = self._client_ap_keys(raw_clients) - names.keys()
 
     async def _fetch_access_points(self) -> dict[str, str]:
         """Fetch UniFi network devices and map AP MAC / device id to name."""
@@ -972,7 +968,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Run a JSON edit under the config lock and publish the new state."""
         async with self._config_lock:
             result = await self.hass.async_add_executor_job(sync_fn, *args)
-            self._loader.reload()
+            await self.hass.async_add_executor_job(self._loader.reload)
             data = self._rebuild_presence_state(list(self._all_clients))
             self.async_set_updated_data(data)
         await self.async_sync_tracker_entities()

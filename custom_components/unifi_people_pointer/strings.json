@@ -43,6 +43,12 @@
       }
     }
   },
+  "issues": {
+    "webui_port_unavailable": {
+      "title": "Web UI port {port} is not available",
+      "description": "The UniFi People Pointer web UI could not listen on port {port}, usually because another service uses it. Presence tracking keeps working. Pick a free port under Settings > Devices & services > UniFi People Pointer > Configure."
+    }
+  },
   "services": {
     "assign_device": {
       "name": "Assign Device to Person",

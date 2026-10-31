@@ -42,5 +42,11 @@
         }
       }
     }
+  },
+  "issues": {
+    "webui_port_unavailable": {
+      "title": "Port {port} der Web-UI ist nicht verfügbar",
+      "description": "Die Web-UI von UniFi People Pointer konnte nicht auf Port {port} lauschen, meist weil ein anderer Dienst ihn nutzt. Die Anwesenheitserkennung läuft weiter. Unter Einstellungen > Geräte & Dienste > UniFi People Pointer > Konfigurieren einen freien Port wählen."
+    }
   }
 }

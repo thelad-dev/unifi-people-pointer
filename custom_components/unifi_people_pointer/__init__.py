@@ -7,8 +7,15 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 
-from .const import CONF_WEBUI_PORT, DEFAULT_EVENT_DEBOUNCE, DEFAULT_WEBUI_PORT, DOMAIN
+from .const import (
+    CONF_WEBUI_PORT,
+    DEFAULT_EVENT_DEBOUNCE,
+    DEFAULT_WEBUI_PORT,
+    DOMAIN,
+    ISSUE_WEBUI_PORT,
+)
 from .coordinator import UniFiPeoplePointerCoordinator
 from .events import UniFiEventManager
 from .services import setup_services, unregister_services
@@ -36,8 +43,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     port = int(entry.options.get(CONF_WEBUI_PORT, DEFAULT_WEBUI_PORT))
     webui = WebUIServer(hass, coordinator, port)
-    await webui.async_start()
+    if await webui.async_start():
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_WEBUI_PORT)
+    else:
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            ISSUE_WEBUI_PORT,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key=ISSUE_WEBUI_PORT,
+            translation_placeholders={"port": str(port)},
+        )
+    try:
+        await _async_finish_setup(hass, entry, coordinator, event_manager, webui)
+    except BaseException:
+        # Free the port so a retry of the setup can bind it again.
+        await webui.async_stop()
+        raise
+    return True
 
+
+async def _async_finish_setup(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    coordinator: UniFiPeoplePointerCoordinator,
+    event_manager: UniFiEventManager,
+    webui: WebUIServer,
+) -> None:
+    """Store runtime data, register services, set up platforms and panel."""
+    port = webui.port
     hass.data[DOMAIN][entry.entry_id] = {
         "entry": entry,
         "coordinator": coordinator,
@@ -65,7 +100,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         len(coordinator.people),
         len(coordinator.devices),
     )
-    return True
 
 
 async def _async_setup_panel(hass: HomeAssistant, port: int) -> None:
@@ -90,6 +124,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if unload_ok:
         runtime = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None) or {}
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_WEBUI_PORT)
         webui = runtime.get("webui")
         if webui is not None:
             if webui.running:

@@ -78,11 +78,11 @@ Hinweis: Frühere 404-Fehler beim Hinzufügen des Repositories lagen oft am dama
 Die Web-UI liegt im Integrationsordner (`custom_components/unifi_people_pointer/webui/`) und kommt mit jeder HACS- oder manuellen Installation mit. Node, Docker oder ein Add-on sind nicht nötig.
 
 - **Start:** mit dem Config-Entry, auch nach jedem HA-Neustart oder HACS-Update (nach dem Update HA neu starten).
-- **Adresse:** lauscht auf `0.0.0.0`, Standardport `8765`. Den Port ändert man unter *Einstellungen → Geräte & Dienste → UniFi People Pointer → Konfigurieren*; die Integration lädt danach neu. Ist der Port belegt, steht ein Fehler im Log, die Integration läuft ohne UI weiter.
+- **Adresse:** lauscht auf `0.0.0.0`, Standardport `8765`. Den Port ändert man unter *Einstellungen → Geräte & Dienste → UniFi People Pointer → Konfigurieren*; die Integration lädt danach neu. Ist der Port belegt, erscheint ein Hinweis unter *Einstellungen → System → Reparaturen*; die Integration läuft ohne UI weiter.
 - **Seitenleiste:** Eintrag **People Pointer** (nur Admins). Das Panel bettet `http://<Host, unter dem HA im Browser geöffnet ist>:<Port>/` ein und übergibt das HA-Token automatisch.
-- **Integrationsseite:** **Konfigurieren** am Eintrag öffnet das Panel; das Gerät "UniFi People Pointer" hat einen Link zur UI.
+- **Integrationsseite:** das Gerät "UniFi People Pointer" hat den Link **Besuchen** zur UI; **Konfigurieren** bleibt der Optionen-Dialog.
 - **HTTPS:** Wird HA per HTTPS geöffnet, bettet der Browser die HTTP-UI nicht ein (Mixed Content). Das Panel zeigt dann einen Link, der die UI in einem neuen Tab öffnet.
-- **Direkt aufrufen:** `http://<HA-Host>:8765/` funktioniert mit einem Long-Lived Access Token (Profil → Sicherheit). Lesen darf jeder aktive Benutzer, Ändern nur Admins.
+- **Direkt aufrufen:** `http://<HA-Host>:8765/` funktioniert mit einem Long-Lived Access Token (Profil → Sicherheit). Das Token muss einem Admin gehören.
 - **Firewall:** Der Port muss vom Browser aus erreichbar sein (bei HA OS ohne weiteres im LAN).
 
 ### Systemvoraussetzungen
@@ -199,11 +199,11 @@ Note: Earlier 404 errors when adding the repository were often caused by the rep
 The web UI lives in the integration folder (`custom_components/unifi_people_pointer/webui/`) and comes with every HACS or manual install. No Node, Docker or add-on is needed.
 
 - **Start:** with the config entry, also after every HA restart or HACS update (restart HA after updating).
-- **Address:** listens on `0.0.0.0`, default port `8765`. Change the port under *Settings → Devices & services → UniFi People Pointer → Configure*; the integration reloads. If the port is taken, an error is logged and the integration keeps running without the UI.
+- **Address:** listens on `0.0.0.0`, default port `8765`. Change the port under *Settings → Devices & services → UniFi People Pointer → Configure*; the integration reloads. If the port is taken, a repair issue appears under *Settings → System → Repairs*; the integration keeps running without the UI.
 - **Sidebar:** entry **People Pointer** (admins only). The panel embeds `http://<host HA is opened under in the browser>:<port>/` and hands over the HA token automatically.
-- **Integration page:** **Configure** on the entry opens the panel; the "UniFi People Pointer" device links to the UI.
+- **Integration page:** the "UniFi People Pointer" device has a **Visit** link to the UI; **Configure** stays the options dialog.
 - **HTTPS:** When HA is opened over HTTPS the browser does not embed the HTTP UI (mixed content). The panel then shows a link that opens the UI in a new tab.
-- **Direct access:** `http://<HA host>:8765/` works with a long-lived access token (Profile → Security). Every active user can read, only admins can change.
+- **Direct access:** `http://<HA host>:8765/` works with a long-lived access token (Profile → Security). The token must belong to an admin.
 - **Firewall:** the port must be reachable from the browser (works out of the box on HA OS in the LAN).
 
 ### System Requirements

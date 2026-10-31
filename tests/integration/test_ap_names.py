@@ -210,6 +210,16 @@ async def test_ap_list_refetch_policy(
         await hass.async_block_till_done()
     assert coordinator.get_ap_name("24:5a:4c:aa:bb:cc") == "EG-Diele"
 
+    # After a failed fetch a new AP does not trigger a fetch on every poll.
+    newer_ap = copy.deepcopy(new_ap)
+    newer_ap[1]["ap_mac"] = "24:5a:4c:aa:bb:ee"
+    with patch(f"{COORD}._fetch_clients", new=AsyncMock(return_value=newer_ap)), patch(
+        f"{COORD}._fetch_access_points", new=AsyncMock(side_effect=OSError)
+    ):
+        await coordinator.async_refresh()
+    fetch = await _refresh(hass, newer_ap)
+    assert fetch.await_count == 0
+
 
 @pytest.mark.real_ap_fetch
 async def test_fetch_access_points_classic_then_integration(hass, mock_config_entry):
