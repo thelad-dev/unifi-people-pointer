@@ -107,3 +107,11 @@ jobs:
       run: |
         git status --porcelain -- custom_components/unifi_people_pointer/webui
         test -z "$(git status --porcelain -- custom_components/unifi_people_pointer/webui)"
+
+    - name: Install Playwright Chromium
+      working-directory: frontend
+      run: npx playwright install --with-deps chromium
+
+    - name: Panel layout tests
+      working-directory: frontend
+      run: npm run test:e2e

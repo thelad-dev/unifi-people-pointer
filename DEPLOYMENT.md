@@ -60,7 +60,7 @@ npm ci
 npm run build
 ```
 
-CI rebuilds the bundle and fails when the committed copy does not match the sources. User-facing setup: [docs/installation.md](docs/installation.md#web-ui).
+CI rebuilds the bundle and fails when the committed copy does not match the sources. It also runs browser layout tests for the sidebar panel (`custom_components/unifi_people_pointer/panel/upp-panel.js`) at desktop, tablet and phone sizes; run them locally with `npx playwright install chromium` once and then `npm run test:e2e` in `frontend/`. User-facing setup: [docs/installation.md](docs/installation.md#web-ui).
 
 ## Installation for Users
 

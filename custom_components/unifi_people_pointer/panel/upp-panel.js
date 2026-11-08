@@ -66,12 +66,17 @@ class UniFiPeoplePointerPanel extends HTMLElement {
     const blocked = window.location.protocol === "https:";
     this.shadowRoot.innerHTML = `
       <style>
-        :host { display: flex; flex-direction: column; height: 100%; background: var(--primary-background-color);
+        /* The panel spans the whole window. Home Assistant's ha-panel-custom
+           wrapper has no height of its own, so a percentage height here
+           collapses the iframe to its default 150px. dvh follows mobile
+           address bars; vh is the fallback. */
+        :host { display: flex; flex-direction: column; height: 100vh; height: 100dvh;
+          background: var(--primary-background-color);
           font-family: var(--ha-font-family-body, var(--paper-font-body1_-_font-family, Roboto, "Noto Sans", sans-serif)); }
         .toolbar { display: flex; align-items: center; height: var(--header-height, 56px); padding: 0 12px;
           background: var(--app-header-background-color, var(--primary-color)); color: var(--app-header-text-color, #fff);
           font-size: 20px; box-sizing: border-box; flex: 0 0 auto; gap: 8px; }
-        iframe { border: 0; width: 100%; flex: 1 1 auto; display: block; }
+        iframe { border: 0; width: 100%; flex: 1 1 auto; min-height: 0; display: block; }
         .notice { margin: 24px auto; max-width: 560px; padding: 24px; border-radius: 12px;
           background: var(--card-background-color); color: var(--primary-text-color); line-height: 1.5; }
         .notice a { color: var(--primary-color); font-weight: 500; }
