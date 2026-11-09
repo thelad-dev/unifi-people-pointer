@@ -23,8 +23,11 @@ from .api_parser import normalize_mac
 from .const import (
     CONF_INCLUDE_UNASSIGNED,
     CONF_NETWORKS,
+    CONF_VERIFY_SSL,
+    DEFAULT_VERIFY_SSL,
     DEFAULT_WEBUI_PORT,
     DOMAIN,
+    FLOORPLAN_MAX_IMAGE_BYTES,
     PANEL_ELEMENT,
     PANEL_ICON,
     PANEL_STATIC_URL,
@@ -33,8 +36,17 @@ from .const import (
     WEBUI_BIND_HOST,
 )
 from .coordinator import UniFiPeoplePointerCoordinator
+from .floorplan import (
+    FloorplanError,
+    clean_level,
+    clean_name,
+    clean_width_m,
+    signal_radius_m,
+)
+from .innerspace import InnerSpaceError, async_fetch_innerspace
 from .network_filter import normalize_selection
 from .presence import person_owns_device
+from .usage import PERIODS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +56,8 @@ DEVICE_TYPES = ("smartphone", "tablet", "laptop", "watch", "wearable", "other")
 _PERSON_ID_RE = re.compile(r"[^a-z0-9_-]+")
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
+# Room for one floor plan image plus the multipart envelope.
+MAX_REQUEST_BYTES = FLOORPLAN_MAX_IMAGE_BYTES + 512 * 1024
 
 
 def slugify_person_id(name: str) -> str:
@@ -106,6 +120,19 @@ class WebUIServer:
         app.router.add_get("/api/access-points", self._access_points)
         app.router.add_get("/api/networks", self._networks)
         app.router.add_put("/api/networks", self._save_networks)
+        app.router.add_get("/api/floorplan", self._floorplan)
+        app.router.add_get("/api/floorplan/usage", self._floorplan_usage)
+        app.router.add_post("/api/floorplan/floors", self._create_floor)
+        app.router.add_put("/api/floorplan/floors/{floor_id}", self._update_floor)
+        app.router.add_delete("/api/floorplan/floors/{floor_id}", self._delete_floor)
+        app.router.add_get("/api/floorplan/floors/{floor_id}/image", self._floor_image)
+        app.router.add_put(
+            "/api/floorplan/floors/{floor_id}/image", self._replace_image
+        )
+        app.router.add_put("/api/floorplan/aps/{mac}", self._place_ap)
+        app.router.add_delete("/api/floorplan/aps/{mac}", self._unplace_ap)
+        app.router.add_put("/api/floorplan/privacy", self._floorplan_privacy)
+        app.router.add_post("/api/floorplan/import/innerspace", self._import_innerspace)
         app.router.add_route("*", "/api/{tail:.*}", self._api_not_found)
         app.router.add_get("/{tail:.*}", self._static)
         return app
@@ -367,8 +394,10 @@ class WebUIServer:
         return web.json_response(person)
 
     async def _delete_person(self, request: web.Request) -> web.Response:
-        if not await self.coordinator.delete_person(request.match_info["person_id"]):
+        person_id = request.match_info["person_id"]
+        if not await self.coordinator.delete_person(person_id):
             raise web.HTTPNotFound(text="person not found")
+        await self._store_call(self._floorplans.remove_person, person_id)
         return web.Response(status=204)
 
     async def _create_device(self, request: web.Request) -> web.Response:
@@ -447,6 +476,293 @@ class WebUIServer:
         name = self._text(body, "name") or None
         await self.coordinator.claim_unknown_device(mac, person, self._role(body), name)
         return web.json_response({"mac": mac}, status=201)
+
+    # --- floor plan -----------------------------------------------------------
+
+    @property
+    def _floorplans(self) -> Any:
+        return self.coordinator.floorplans
+
+    async def _floorplan(self, request: web.Request) -> web.Response:
+        store = self._floorplans
+        positions = store.ap_positions
+        floors = [
+            {
+                "id": floor["id"],
+                "name": floor["name"],
+                "level": floor["level"],
+                "width": floor["width"],
+                "height": floor["height"],
+                "width_m": floor["width_m"],
+                "image_url": (
+                    f"/api/floorplan/floors/{floor['id']}/image?v={floor['image']}"
+                ),
+            }
+            for floor in store.floors
+        ]
+        aps = []
+        known: set[str] = set()
+        for ap in self.coordinator.get_access_points():
+            mac = normalize_mac(str(ap["mac"]))
+            known.add(mac)
+            aps.append({**ap, "mac": mac, **self._position(positions.get(mac))})
+        # Placed APs UniFi does not list right now stay visible (and movable).
+        for mac, pos in positions.items():
+            if mac not in known:
+                aps.append(
+                    {"mac": mac, "name": None, "clients": 0, **self._position(pos)}
+                )
+        persons = []
+        for person in self.coordinator.people:
+            person_id = str(person.get("id"))
+            if not store.person_located(person_id):
+                continue
+            location = self.coordinator.get_person_location(person_id)
+            if location is None:
+                continue
+            persons.append(
+                {
+                    "id": person_id,
+                    "name": person.get("name") or person_id,
+                    "ap_mac": location["ap_mac"],
+                    "ap_name": location["ap_name"],
+                    "signal": location["signal"],
+                    "radius_m": signal_radius_m(location["signal"]),
+                    **self._position(positions.get(location["ap_mac"])),
+                }
+            )
+        return web.json_response(
+            {
+                "floors": floors,
+                "aps": aps,
+                "persons": persons,
+                "privacy": store.privacy,
+            }
+        )
+
+    async def _floorplan_usage(self, request: web.Request) -> web.Response:
+        """AP usage per period for the heatmap; counters per AP only."""
+        period = request.query.get("period", "now")
+        if period != "now" and period not in PERIODS:
+            raise web.HTTPBadRequest(text="period must be now, 1h, 24h or 7d")
+        usage = self.coordinator.usage
+        positions = self._floorplans.ap_positions
+        names = {
+            normalize_mac(str(ap["mac"])): ap.get("name")
+            for ap in self.coordinator.get_access_points()
+        }
+        if period == "now":
+            values = {
+                mac: {
+                    "clients": float(count),
+                    "clients_max": count,
+                    "bytes": (
+                        round(usage.current_rates.get(mac, 0.0))
+                        if usage.current_rates
+                        else None
+                    ),
+                }
+                for mac, count in usage.current_counts.items()
+            }
+            for mac in usage.current_rates:
+                values.setdefault(
+                    mac,
+                    {
+                        "clients": 0.0,
+                        "clients_max": 0,
+                        "bytes": round(usage.current_rates[mac]),
+                    },
+                )
+            samples, since = (1 if usage.current_counts else 0), None
+            has_bytes = bool(usage.current_rates)
+        else:
+            summary = usage.summary(period)
+            values = summary["aps"]
+            samples, since = summary["samples"], summary["since"]
+            has_bytes = usage.has_bytes
+        empty = {"clients": 0.0, "clients_max": 0, "bytes": 0 if has_bytes else None}
+        rows = [
+            {
+                "mac": mac,
+                "name": names.get(mac),
+                **(values.get(mac) or empty),
+                **self._position(positions.get(mac)),
+            }
+            for mac in sorted(set(names) | set(values) | set(positions))
+        ]
+        return web.json_response(
+            {
+                "period": period,
+                # "now": bytes per second; other periods: estimated bytes.
+                "bytes_unit": "B/s" if period == "now" else "B",
+                "has_bytes": has_bytes,
+                "samples": samples,
+                "since": _iso(since),
+                "aps": rows,
+            }
+        )
+
+    @staticmethod
+    def _position(pos: dict[str, Any] | None) -> dict[str, Any]:
+        if not pos:
+            return {"floor": None, "x": None, "y": None}
+        return {"floor": pos["floor"], "x": pos["x"], "y": pos["y"]}
+
+    async def _form(self, request: web.Request) -> tuple[dict[str, str], bytes | None]:
+        """Read a multipart form: text fields plus an optional ``image`` file."""
+        try:
+            form = await request.clone(client_max_size=MAX_REQUEST_BYTES).post()
+        except web.HTTPRequestEntityTooLarge as err:
+            raise web.HTTPBadRequest(text="image is too large") from err
+        fields: dict[str, str] = {}
+        image: bytes | None = None
+        for key, value in form.items():
+            if key == "image" and isinstance(value, web.FileField):
+                image = await self.hass.async_add_executor_job(value.file.read)
+            elif isinstance(value, str):
+                fields[key] = value
+        return fields, image
+
+    async def _store_call(self, fn: Callable[..., Any], *args: Any) -> Any:
+        """Run a floor plan store change; map its errors to HTTP answers."""
+        try:
+            return await self._floorplans.async_change(self.hass, fn, *args)
+        except FloorplanError as err:
+            raise web.HTTPBadRequest(text=str(err)) from err
+        except KeyError as err:
+            raise web.HTTPNotFound(text="floor not found") from err
+
+    @staticmethod
+    def _floor_fields(body: dict[str, Any]) -> tuple[str, int, float | None]:
+        try:
+            return (
+                clean_name(body.get("name")),
+                clean_level(body.get("level")),
+                clean_width_m(body.get("width_m")),
+            )
+        except FloorplanError as err:
+            raise web.HTTPBadRequest(text=str(err)) from err
+
+    async def _create_floor(self, request: web.Request) -> web.Response:
+        fields, image = await self._form(request)
+        name, level, width_m = self._floor_fields(fields)
+        if image is None:
+            raise web.HTTPBadRequest(text="image is required")
+        store = self._floorplans
+        floor = await self._store_call(store.add_floor, name, level, image, width_m)
+        return web.json_response(floor, status=201)
+
+    async def _update_floor(self, request: web.Request) -> web.Response:
+        body = await self._json_body(request)
+        name, level, width_m = self._floor_fields(body)
+        store = self._floorplans
+        floor = await self._store_call(
+            store.update_floor, request.match_info["floor_id"], name, level, width_m
+        )
+        return web.json_response(floor)
+
+    async def _replace_image(self, request: web.Request) -> web.Response:
+        _, image = await self._form(request)
+        if image is None:
+            raise web.HTTPBadRequest(text="image is required")
+        store = self._floorplans
+        floor = await self._store_call(
+            store.replace_image, request.match_info["floor_id"], image
+        )
+        return web.json_response(floor)
+
+    async def _delete_floor(self, request: web.Request) -> web.Response:
+        store = self._floorplans
+        await self._store_call(store.delete_floor, request.match_info["floor_id"])
+        return web.Response(status=204)
+
+    async def _floor_image(self, request: web.Request) -> web.StreamResponse:
+        found = self._floorplans.image_file(request.match_info["floor_id"])
+        if found is None or not found[0].is_file():
+            raise web.HTTPNotFound(text="image not found")
+        path, content_type = found
+        # The URL changes with every upload; the image is private to admins.
+        return web.FileResponse(
+            path,
+            headers={
+                "Content-Type": content_type,
+                "Cache-Control": "private, max-age=31536000, immutable",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    async def _place_ap(self, request: web.Request) -> web.Response:
+        body = await self._json_body(request)
+        store = self._floorplans
+        position = await self._store_call(
+            store.set_ap_position,
+            request.match_info["mac"],
+            self._text(body, "floor", required=True),
+            body.get("x"),
+            body.get("y"),
+        )
+        return web.json_response(position)
+
+    async def _unplace_ap(self, request: web.Request) -> web.Response:
+        store = self._floorplans
+        if not await self._store_call(
+            store.clear_ap_position, request.match_info["mac"]
+        ):
+            raise web.HTTPNotFound(text="access point is not placed")
+        return web.Response(status=204)
+
+    async def _floorplan_privacy(self, request: web.Request) -> web.Response:
+        body = await self._json_body(request)
+        persons = body.get("persons") or []
+        if not isinstance(persons, list):
+            raise web.HTTPBadRequest(text="persons must be a list")
+        persons = [str(p) for p in persons]
+        unknown = [p for p in persons if not self._person_exists(p)]
+        if unknown:
+            raise web.HTTPBadRequest(text=f"unknown person: {', '.join(unknown)}")
+        store = self._floorplans
+        privacy = await self._store_call(
+            store.set_privacy, body.get("locate_persons") is True, persons
+        )
+        return web.json_response(privacy)
+
+    async def _import_innerspace(self, request: web.Request) -> web.Response:
+        body = await self._json_body(request)
+        # Credentials live only in this request; never log or store them.
+        username = str(body.get("username") or "").strip()
+        password = str(body.get("password") or "")
+        data = self.coordinator.config_entry.data
+        try:
+            result = await async_fetch_innerspace(
+                str(data["host"]),
+                bool(data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)),
+                username,
+                password,
+            )
+        except InnerSpaceError as err:
+            return web.json_response({"error": str(err)}, status=502)
+        if not result.floors:
+            return web.json_response(
+                {
+                    "error": "InnerSpace has no floor plan with an image.",
+                    "warnings": result.warnings,
+                },
+                status=422,
+            )
+        store = self._floorplans
+        summary = await self._store_call(store.import_floors, result.floors)
+        _LOGGER.info(
+            "Imported %d floor plan(s) and %d AP position(s) from UniFi InnerSpace",
+            len(result.floors),
+            summary["aps_placed"],
+        )
+        return web.json_response(
+            {
+                **summary,
+                "skipped_aps": result.skipped_aps,
+                "warnings": result.warnings,
+            }
+        )
 
 
 # --- Home Assistant integration (panel + link) ----------------------------------

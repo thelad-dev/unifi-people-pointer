@@ -53,6 +53,27 @@ Presence-Regel: Person „zu Hause“, wenn **mindestens ein** referenziertes Ge
 
 Watch-Zuordnung zu Christoph ist geschätzt und sollte bei Bedarf korrigiert werden.
 
+## `floorplans.json`
+
+Grundrisse für den Reiter *Floor plan* der Web-UI; wird von der Web-UI geschrieben. Bilder liegen daneben in `floorplans/` (Dateiname wechselt mit jedem Upload).
+
+```json
+{
+  "version": 1,
+  "floors": [
+    {"id": "eg", "name": "EG", "level": 0, "image": "eg-1a2b3c4d.png", "width": 700, "height": 1200, "width_m": 12.0}
+  ],
+  "aps": {
+    "24:5a:4c:aa:bb:cc": {"floor": "eg", "x": 0.3, "y": 0.45}
+  },
+  "privacy": {"locate_persons": false, "persons": []}
+}
+```
+
+- `width`/`height`: Bildgröße in Pixeln; `width_m`: echte Breite in Metern oder `null`.
+- `aps`: Position je AP-MAC als Anteil der Bildbreite (`x`) und -höhe (`y`), 0 bis 1, Ursprung oben links.
+- `privacy`: Personen werden nur gezeigt, wenn `locate_persons` an ist und ihre ID in `persons` steht.
+
 ## Match-Algorithmus
 
 1. Live-Client von der API holen.

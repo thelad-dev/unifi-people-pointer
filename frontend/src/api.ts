@@ -162,6 +162,87 @@ export interface NetworkSettings {
   unassigned_clients: number;
 }
 
+export interface Floor {
+  id: string;
+  name: string;
+  level: number;
+  width: number;
+  height: number;
+  width_m: number | null;
+  image_url: string;
+}
+
+// Position on a floor as fractions of the image width and height (0..1).
+export interface MapPosition {
+  floor: string | null;
+  x: number | null;
+  y: number | null;
+}
+
+export interface MapAccessPoint extends MapPosition {
+  mac: string;
+  name: string | null;
+  clients: number;
+}
+
+export interface MapPerson extends MapPosition {
+  id: string;
+  name: string;
+  ap_mac: string;
+  ap_name: string | null;
+  signal: number | null;
+  radius_m: number;
+}
+
+export interface FloorPlanPrivacy {
+  locate_persons: boolean;
+  persons: string[];
+}
+
+export interface FloorPlanData {
+  floors: Floor[];
+  aps: MapAccessPoint[];
+  persons: MapPerson[];
+  privacy: FloorPlanPrivacy;
+}
+
+export type UsagePeriod = 'now' | '1h' | '24h' | '7d';
+
+export interface ApUsage extends MapPosition {
+  mac: string;
+  name: string | null;
+  clients: number;
+  clients_max: number;
+  bytes: number | null;
+}
+
+export interface UsageData {
+  period: UsagePeriod;
+  bytes_unit: 'B/s' | 'B';
+  has_bytes: boolean;
+  samples: number;
+  since: string | null;
+  aps: ApUsage[];
+}
+
+export interface InnerSpaceImport {
+  floors_created: number;
+  floors_updated: number;
+  aps_placed: number;
+  skipped_aps: string[];
+  warnings: string[];
+}
+
+// Multipart upload: let the browser set the boundary.
+export function postForm<T>(method: 'post' | 'put', path: string, form: FormData) {
+  return api.request<T>({
+    method,
+    url: path,
+    data: form,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
 export const DEVICE_TYPES = ['smartphone', 'tablet', 'laptop', 'watch', 'wearable', 'other'];
 
 export default api;

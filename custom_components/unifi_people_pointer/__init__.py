@@ -41,6 +41,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     coordinator = UniFiPeoplePointerCoordinator(hass, entry)
+    await hass.async_add_executor_job(coordinator.floorplans.load)
+    await coordinator.usage.async_load()
     await coordinator.async_config_entry_first_refresh()
 
     debounce = int(entry.options.get("event_debounce", DEFAULT_EVENT_DEBOUNCE))
@@ -163,6 +165,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if unload_ok:
         runtime = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None) or {}
+        coordinator = runtime.get("coordinator")
+        if coordinator is not None:
+            await coordinator.usage.async_flush()
         ir.async_delete_issue(hass, DOMAIN, ISSUE_WEBUI_PORT)
         webui = runtime.get("webui")
         if webui is not None:

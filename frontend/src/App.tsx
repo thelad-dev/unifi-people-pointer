@@ -5,6 +5,7 @@ import Persons from './pages/Persons';
 import UnknownClients from './pages/UnknownClients';
 import AccessPoints from './pages/AccessPoints';
 import Networks from './pages/Networks';
+import FloorPlan from './pages/FloorPlan';
 import { currentToken, embedded, onTokenChange, requestPanelToken, saveToken } from './api';
 import './App.css';
 
@@ -43,6 +44,7 @@ function TokenGate() {
 
 const PAGES = [
   { hash: '', label: 'Overview', element: <Dashboard /> },
+  { hash: 'floor-plan', label: 'Floor plan', element: <FloorPlan /> },
   { hash: 'persons', label: 'Persons', element: <Persons /> },
   { hash: 'devices', label: 'Devices', element: <Devices /> },
   { hash: 'unknown-clients', label: 'Unknown Clients', element: <UnknownClients /> },

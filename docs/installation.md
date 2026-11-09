@@ -85,6 +85,19 @@ Die Web-UI liegt im Integrationsordner (`custom_components/unifi_people_pointer/
 - **Direkt aufrufen:** `http://<HA-Host>:8765/` funktioniert mit einem Long-Lived Access Token (Profil → Sicherheit). Das Token muss einem Admin gehören.
 - **Firewall:** Der Port muss vom Browser aus erreichbar sein (bei HA OS ohne weiteres im LAN).
 
+### Grundriss
+
+Reiter **Floor plan** der Web-UI.
+
+- **Grundrisse:** unter **Edit → + Floor** ein Bild je Stockwerk hochladen (PNG, JPEG oder WebP, höchstens 15 MB, kein SVG). *Level* ordnet die Stockwerke (z. B. -1 Keller, 0 Erdgeschoss). *Width (m)* ist die echte Breite des Plans und bestimmt die Größe der Unsicherheitskreise; ohne Angabe gilt der Plan als 15 m breit. Bilder und Positionen liegen nur im HA-Config-Verzeichnis (`unifi_people_pointer/floorplans.json` und `unifi_people_pointer/floorplans/`) und werden nur mit Admin-Token ausgeliefert.
+- **Access Points platzieren:** in der Liste *Access points* auf **Place** und dann auf die Stelle im Plan klicken; Marker lassen sich ziehen oder mit den Pfeiltasten verschieben. Die Position wird als Anteil der Bildbreite und -höhe gespeichert, ein ersetztes Bild behält die Punkte.
+- **Import aus UniFi InnerSpace:** Die Grundrisse der UniFi-OS-App InnerSpace sind nur mit einer UniFi-OS-Sitzung lesbar, nicht mit dem API-Key. **Import from InnerSpace** meldet sich einmalig an, liest Grundrisse, AP-Positionen und Bilder und meldet sich wieder ab. Das Konto muss lokal sein, für InnerSpace die Rolle Admin haben und ohne Zwei-Faktor-Anmeldung auskommen. Benutzer und Passwort werden weder gespeichert noch geloggt. Stockwerke mit gleichem Namen werden ersetzt (Bild und Positionen ihrer APs), andere bleiben. Eine gedrehte Karte wird eingerechnet; den InnerSpace-Maßstab übernimmt der Import nur, wenn die Planbreite damit zwischen 4 und 80 m liegt.
+- **Personen:** Marker sitzen am AP, an dem das erste verbundene Gerät der Person hängt; mehrere Personen am selben AP werden versetzt. Der Kreis ist eine grobe Schätzung aus dem Signal (stark: etwa 2 m, schwach: bis 15 m). Clients bleiben gern an einem AP hängen, auch durch Decken; das Stockwerk stimmt meist, aber nicht immer.
+- **Datenschutz:** Ortung ist aus, bis sie unter **Edit → Privacy** eingeschaltet und die Person freigegeben ist. Erst dann liefert der Server ihre Position. Beim Löschen einer Person entfällt ihre Freigabe. Es wird kein Verlauf gespeichert und es gibt keine neuen Attribute mit Koordinaten in HA.
+- **Heatmap:** Schalter **Heatmap** in der Ansicht. Jeder platzierte AP bekommt einen Farbfleck nach seiner Nutzung, die Farbskala reicht vom kühlsten bis zum meistgenutzten AP des ganzen Hauses (Stockwerke bleiben vergleichbar); die Liste daneben ordnet alle APs. Wählbar sind **Now** (letzter Poll), **1 h**, **24 h** und **7 d** sowie **Clients** (Durchschnitt der WLAN-Clients je Poll) oder **Data** (Datenmenge, geschätzt aus den Client-Raten, die UniFi bei jedem Poll meldet; bei *Now* die aktuelle Rate). *Data* gibt es nur, wenn UniFi Raten liefert (klassische Client-Liste); über die Integrations-API bleiben es Client-Zahlen. Ist ein Netzfilter gesetzt, zählen nur Clients aus den gewählten Netzen ([Konfiguration](configuration.md#netzfilter)).
+- **Heatmap-Speicher:** nur Zähler je AP-MAC, keine Client-, Geräte- oder Personendaten: 5-Minuten-Schritte für 24 Stunden und Stundenschritte für 7 Tage, ältere Werte werden verworfen. Die Datei liegt in `.storage/unifi_people_pointer.ap_usage.<Eintrag>` und wird höchstens alle 5 Minuten geschrieben.
+- **Genauigkeit:** UniFi meldet je Gerät nur den einen AP, an dem es hängt, mit dessen Signal; Trilateration geht damit nicht. Raumgenau wird es erst mit Bluetooth-Raumpräsenz (z. B. ESPHome-Bluetooth-Proxys mit Bermuda) als zusätzlicher Quelle.
+
 ### Systemvoraussetzungen
 
 - **Home Assistant:** 2024.1.0 oder neuer
@@ -205,6 +218,19 @@ The web UI lives in the integration folder (`custom_components/unifi_people_poin
 - **HTTPS:** When HA is opened over HTTPS the browser does not embed the HTTP UI (mixed content). The panel then shows a link that opens the UI in a new tab.
 - **Direct access:** `http://<HA host>:8765/` works with a long-lived access token (Profile → Security). The token must belong to an admin.
 - **Firewall:** the port must be reachable from the browser (works out of the box on HA OS in the LAN).
+
+### Floor plan
+
+**Floor plan** tab of the web UI.
+
+- **Floor plans:** under **Edit → + Floor** upload one image per floor (PNG, JPEG or WebP, at most 15 MB, no SVG). *Level* orders the floors (for example -1 basement, 0 ground floor). *Width (m)* is the real width of the plan and sets the size of the uncertainty circles; without it the plan counts as 15 m wide. Images and positions stay in the HA config directory (`unifi_people_pointer/floorplans.json` and `unifi_people_pointer/floorplans/`) and are served only with an admin token.
+- **Placing access points:** in the *Access points* list choose **Place**, then click the spot on the plan; drag markers or move them with the arrow keys. Positions are stored as fractions of the image width and height, so a replaced image keeps the points.
+- **Import from UniFi InnerSpace:** floor plans of the UniFi OS app InnerSpace can only be read with a UniFi OS session, not with the API key. **Import from InnerSpace** signs in once, reads floor plans, AP positions and images, and signs out. The account must be local, have the Admin role for InnerSpace and no two-factor sign-in. User name and password are neither stored nor logged. Floors with the same name are replaced (image and the positions of their APs), others stay. A rotated map is taken into account; the InnerSpace scale is only used when it gives a plan width between 4 and 80 m.
+- **People:** markers sit at the AP of the person's first connected device; several people at one AP fan out. The circle is a rough estimate from the signal (strong: about 2 m, weak: up to 15 m). Clients tend to stick to an AP, even through ceilings; the floor is usually right, but not always.
+- **Privacy:** locating is off until it is switched on and the person is released under **Edit → Privacy**. Only then does the server return their position. Deleting a person removes their release. No history is kept and no new attributes with coordinates appear in HA.
+- **Heatmap:** the **Heatmap** switch in the view. Every placed AP gets a color spot by its usage; the scale runs from the least to the most used AP of the whole house (floors stay comparable), and the list next to it ranks all APs. Choose **Now** (last poll), **1 h**, **24 h** or **7 d**, and **Clients** (average wireless clients per poll) or **Data** (data volume estimated from the client rates UniFi reports at each poll; the current rate for *Now*). *Data* is only available when UniFi reports rates (classic client list); with the integration API it stays client counts. With a network filter set, only clients from the selected networks count ([configuration](configuration.md#network-filter)).
+- **Heatmap storage:** counters per AP MAC only, nothing about clients, devices or people: 5-minute steps for 24 hours and hourly steps for 7 days, older values are dropped. The file is `.storage/unifi_people_pointer.ap_usage.<entry>` and is written at most every 5 minutes.
+- **Accuracy:** UniFi reports only the one AP a device is connected to, with its signal; trilateration is not possible with that. Room accuracy needs Bluetooth room presence (for example ESPHome Bluetooth proxies with Bermuda) as an additional source.
 
 ### System Requirements
 

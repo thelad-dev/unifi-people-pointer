@@ -317,7 +317,7 @@ Zuordnung eines Clients, sobald `networks` nicht leer ist:
 
 Die UniFi-Netzwerke liest die Integration alle 10 Minuten aus `rest/networkconf` (ersatzweise Integration-API `/v1/sites/{id}/networks`). Ohne diese Liste zeigt die Auswahl die tatsächlich auftretenden Adressbereiche (IPv4 /24, IPv6 /64) und die Netzwerke, die die Clients selbst melden.
 
-Wirkung: Der Filter greift direkt nach dem Abruf der Clients. Anwesenheit, Geräte, unbekannte und Gast-Clients, Clientzahlen der Access Points, Tracker und Ereignisse sehen nur noch Clients aus den gewählten Netzen. Ein eingerichtetes Gerät, das nur außerhalb online ist, wird als Tracker `unavailable`; `devices.json` und `people.json` bleiben unverändert. Ändern sich nur diese beiden Optionen, wird der Filter sofort angewendet, ohne die Integration neu zu laden.
+Wirkung: Der Filter greift direkt nach dem Abruf der Clients. Anwesenheit, Geräte, unbekannte und Gast-Clients, Clientzahlen der Access Points, Personenmarker auf dem Grundriss, Heatmap, Tracker und Ereignisse sehen nur noch Clients aus den gewählten Netzen; bereits gespeicherte Heatmap-Werte bleiben, wie sie aufgezeichnet wurden. Ein eingerichtetes Gerät, das nur außerhalb online ist, wird als Tracker `unavailable`; `devices.json` und `people.json` bleiben unverändert. Ändern sich nur diese beiden Optionen, wird der Filter sofort angewendet, ohne die Integration neu zu laden.
 
 Web-API (Admin-Token wie alle Endpunkte): `GET /api/networks` liefert Auswahl und erkannte Netze mit Clientzahl, `PUT /api/networks` mit `{"networks": [...], "include_unassigned_clients": true}` speichert; ungültige Einträge werden mit HTTP 400 abgelehnt.
 
@@ -658,7 +658,7 @@ How a client is matched once `networks` is not empty:
 
 The integration reads the UniFi networks every 10 minutes from `rest/networkconf` (or the integration API `/v1/sites/{id}/networks`). Without that list the selection offers the address ranges clients actually use (IPv4 /24, IPv6 /64) and the networks clients report themselves.
 
-Effect: the filter applies right after the clients are fetched. Presence, devices, unknown and guest clients, access point client counts, trackers and events only see clients from the selected networks. A configured device that is online only outside turns its tracker `unavailable`; `devices.json` and `people.json` stay untouched. When only these two options change, the filter applies immediately without reloading the integration.
+Effect: the filter applies right after the clients are fetched. Presence, devices, unknown and guest clients, access point client counts, person markers on the floor plan, the heatmap, trackers and events only see clients from the selected networks; heatmap values already stored stay as recorded. A configured device that is online only outside turns its tracker `unavailable`; `devices.json` and `people.json` stay untouched. When only these two options change, the filter applies immediately without reloading the integration.
 
 Web API (admin token like every endpoint): `GET /api/networks` returns the selection and detected networks with client counts, `PUT /api/networks` with `{"networks": [...], "include_unassigned_clients": true}` saves it; invalid entries are rejected with HTTP 400.
 

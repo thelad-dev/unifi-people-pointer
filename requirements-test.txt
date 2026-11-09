@@ -16,3 +16,6 @@ freezegun>=1.2.2
 
 # IANA time zone database for zoneinfo (HA test harness sets US/Pacific)
 tzdata>=2024.1
+
+# Image validation in floorplan.py (bundled with Home Assistant at runtime)
+Pillow>=10.0.0

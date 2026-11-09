@@ -22,6 +22,7 @@ UniFi People Pointer ist eine fortschrittliche Home Assistant Integration, die P
 - **Access Points**: Tracker zeigen den AP, an dem ein Gerät hängt, z. B. `Phone AP: Living-Room`
 - **Web-UI**: Wird mit der Integration installiert, Seitenleisten-Eintrag "People Pointer"
 - **Netzfilter**: Nur Clients aus gewählten Subnetzen oder UniFi-Netzwerken berücksichtigen
+- **Grundriss**: Personen ungefähr am AP ihres Geräts auf dem eigenen Grundriss, mit Unsicherheitskreis, dazu eine Heatmap der AP-Nutzung
 
 #### 🚀 Installation
 
@@ -144,7 +145,11 @@ Die Änderung wirkt sofort, ohne die Integration neu zu laden. Details: [docs/co
 
 #### 🔧 Web-UI
 
-Die Web-UI ist Teil der Integration, eine Zusatzinstallation gibt es nicht. Sie startet mit dem Config-Entry, lauscht auf `0.0.0.0` (Standardport `8765`, änderbar unter Optionen) und erscheint für Admins als Seitenleisten-Eintrag **People Pointer**; auf der Integrationsseite führt der Link **Besuchen** am Gerät "UniFi People Pointer" dorthin. Sie bietet Übersicht, Personen, Geräte, unbekannte Clients (beanspruchen), Access Points und die Netzauswahl. Jede API-Anfrage braucht das HA-Token eines Admins (im Panel automatisch, direkt aufgerufen ein Long-Lived Token). Ist der Port belegt, erscheint ein Hinweis unter Reparaturen. Details: [docs/installation.md](docs/installation.md#web-ui).
+Die Web-UI ist Teil der Integration, eine Zusatzinstallation gibt es nicht. Sie startet mit dem Config-Entry, lauscht auf `0.0.0.0` (Standardport `8765`, änderbar unter Optionen) und erscheint für Admins als Seitenleisten-Eintrag **People Pointer**; auf der Integrationsseite führt der Link **Besuchen** am Gerät "UniFi People Pointer" dorthin. Sie bietet Übersicht, Grundriss, Personen, Geräte, unbekannte Clients (beanspruchen), Access Points und die Netzauswahl. Jede API-Anfrage braucht das HA-Token eines Admins (im Panel automatisch, direkt aufgerufen ein Long-Lived Token). Ist der Port belegt, erscheint ein Hinweis unter Reparaturen. Details: [docs/installation.md](docs/installation.md#web-ui).
+
+#### 🗺️ Grundriss
+
+Der Reiter **Floor plan** zeigt je Stockwerk ein Grundrissbild, die Access Points und Personen am AP, an dem ihr Gerät gerade hängt. Ein Kreis um den AP zeigt die Unschärfe (aus der Signalstärke geschätzt); UniFi meldet je Gerät nur diesen einen AP, raumgenau ist das nicht. Grundrisse lädt man unter **Edit** hoch (PNG, JPEG, WebP) und setzt die APs per Klick oder Ziehen, oder man übernimmt Grundrisse und AP-Positionen einmalig aus **UniFi InnerSpace** (Anmeldung mit einem lokalen UniFi-OS-Konto, Passwort wird nicht gespeichert). Personen erscheinen erst, wenn unter **Edit → Privacy** die Ortung eingeschaltet und die Person freigegeben ist; ein Verlauf der Position wird nicht gespeichert. Die **Heatmap** färbt die APs nach Nutzung (Clients oder Datenmenge; jetzt, 1 h, 24 h, 7 Tage); dafür speichert die Integration nur Zähler je AP, keine Personen- oder Gerätedaten. Details: [docs/installation.md](docs/installation.md#grundriss).
 
 #### 📋 Anforderungen
 
@@ -181,6 +186,7 @@ UniFi People Pointer is an advanced Home Assistant integration that tracks peopl
 - **Access points**: Trackers show the AP a device is connected to, e.g. `Phone AP: Living-Room`
 - **Web UI**: Installed with the integration, sidebar entry "People Pointer"
 - **Network filter**: Only count clients from selected subnets or UniFi networks
+- **Floor plan**: People shown roughly at the AP of their device on your own floor plan, with an uncertainty circle, plus a heatmap of AP usage
 
 #### 🚀 Installation
 
@@ -303,7 +309,11 @@ Changes apply right away, without reloading the integration. Details: [docs/conf
 
 #### 🔧 Web UI
 
-The web UI ships with the integration; there is nothing extra to install. It starts with the config entry, listens on `0.0.0.0` (default port `8765`, configurable in the options) and shows up for admins as the sidebar entry **People Pointer**; on the integration page the **Visit** link on the "UniFi People Pointer" device leads there. It offers an overview, persons, devices, unknown clients (claim), access points and the network selection. Every API request needs an admin's Home Assistant token (handed over automatically inside the panel, a long-lived token when opened directly). If the port is taken, a repair issue says so. Details: [docs/installation.md](docs/installation.md#web-ui-1).
+The web UI ships with the integration; there is nothing extra to install. It starts with the config entry, listens on `0.0.0.0` (default port `8765`, configurable in the options) and shows up for admins as the sidebar entry **People Pointer**; on the integration page the **Visit** link on the "UniFi People Pointer" device leads there. It offers an overview, a floor plan, persons, devices, unknown clients (claim), access points and the network selection. Every API request needs an admin's Home Assistant token (handed over automatically inside the panel, a long-lived token when opened directly). If the port is taken, a repair issue says so. Details: [docs/installation.md](docs/installation.md#web-ui-1).
+
+#### 🗺️ Floor plan
+
+The **Floor plan** tab shows one image per floor, the access points, and people at the AP their device is connected to. A circle around the AP shows the uncertainty (estimated from signal strength); UniFi reports only this one AP per device, so this is not room-accurate. Upload plans under **Edit** (PNG, JPEG, WebP) and place the APs by clicking or dragging, or take over floor plans and AP positions once from **UniFi InnerSpace** (sign-in with a local UniFi OS account, the password is not stored). People appear only after locating is switched on and the person is released under **Edit → Privacy**; no position history is kept. The **heatmap** colors the APs by usage (clients or data; now, 1 h, 24 h, 7 days); for this the integration keeps only counters per AP, nothing about people or devices. Details: [docs/installation.md](docs/installation.md#floor-plan).
 
 #### 📋 Requirements
 

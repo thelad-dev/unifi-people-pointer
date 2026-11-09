@@ -97,6 +97,17 @@ DEVICES_FILE = "devices.json"
 AP_ZONES_FILE = "ap_zones.json"
 MANUFACTURERS_FILE = "manufacturers.json"
 OUI_VENDORS_FILE = "oui_vendors.json"
+FLOORPLANS_FILE = "floorplans.json"
+FLOORPLAN_IMAGE_DIR = "floorplans"
+
+# Floor plans: upload limits and the person uncertainty radius (meters).
+FLOORPLAN_MAX_IMAGE_BYTES = 15 * 1024 * 1024
+FLOORPLAN_MAX_IMAGE_SIDE = 12000
+FLOORPLAN_MIN_RADIUS_M = 2.0
+FLOORPLAN_MAX_RADIUS_M = 15.0
+FLOORPLAN_DEFAULT_RADIUS_M = 8.0
+# Assumed real width of a plan without a calibrated width (meters).
+FLOORPLAN_DEFAULT_WIDTH_M = 15.0
 
 # AP names: re-fetch the UniFi device list at least this often (seconds),
 # and immediately when a client reports an AP that is not in the map yet.
@@ -109,3 +120,13 @@ AUTO_DISMISS_DAYS = 7
 
 # Platforms
 PLATFORMS = ["device_tracker", "sensor"]
+
+# AP usage history for the heatmap: 5-minute buckets for a day, hourly
+# buckets for a week; written at most every few minutes.
+USAGE_FINE_BUCKET_S = 300
+USAGE_FINE_KEEP_S = 24 * 3600
+USAGE_COARSE_BUCKET_S = 3600
+USAGE_COARSE_KEEP_S = 7 * 24 * 3600
+USAGE_SAVE_DELAY_S = 300
+# Data estimate: never count more than this many poll intervals per sample.
+USAGE_MAX_GAP_FACTOR = 3

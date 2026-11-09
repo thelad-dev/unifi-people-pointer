@@ -1,6 +1,6 @@
 {
   "name": "unifi-people-pointer-frontend",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Web UI of UniFi People Pointer (bundled into the Home Assistant integration)",
   "private": true,
   "type": "module",

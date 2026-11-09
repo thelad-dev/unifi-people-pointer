@@ -53,6 +53,7 @@ from .device_matcher import (
     normalize_hostname_match,
     partial_matching_devices,
 )
+from .floorplan import FloorplanStore
 from .network_filter import (
     NetworkFilter,
     UniFiNetwork,
@@ -61,6 +62,7 @@ from .network_filter import (
     parse_networks,
 )
 from .presence import _online_device_ids, determine_presence, person_owns_device
+from .usage import ApUsageHistory, usage_sample
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -126,6 +128,10 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             devices_path=storage / DEVICES_FILE,
             people_path=storage / PEOPLE_FILE,
         )
+        # Floor plans and AP positions; loaded in the executor at setup.
+        self.floorplans = FloorplanStore(storage)
+        # Per-AP usage counters for the heatmap; loaded at setup.
+        self.usage = ApUsageHistory(hass, config_entry.entry_id, scan)
         self._clients_by_mac: dict[str, dict[str, Any]] = {}
         # Clients inside the network filter; everything below works on these.
         self._all_clients: list[dict[str, Any]] = []
@@ -398,6 +404,10 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if raw_clients is not None:
                 all_clients = deduplicate_clients(parse_clients(raw_clients))
                 data = self._rebuild_presence_state(all_clients)
+                # Count only clients inside the network filter.
+                self.usage.record(
+                    time.time(), *usage_sample(self._all_clients, self.ap_mac_for_key)
+                )
             elif (
                 self._unfiltered_clients
                 or self._clients_by_mac
@@ -858,6 +868,36 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return name
         return None
 
+    def get_person_location(self, person_id: str) -> dict[str, Any] | None:
+        """AP (normalized MAC), AP name and signal of a person at home.
+
+        Uses the same device as ``get_person_ap_name``: the first online
+        device of the person that is connected to an access point.
+        """
+        row = self._presence_by_person.get(person_id)
+        if not row or not row.get("is_home"):
+            return None
+        for device_id in row.get("online_device_ids") or []:
+            device = self._devices_by_id.get(str(device_id))
+            client = self._live_client_for_device(device)
+            if not client or client.get("is_wired") or not client.get("ap_mac"):
+                continue
+            signal = client.get("signal")
+            if signal is None:
+                signal = client.get("signal_strength")
+            return {
+                "ap_mac": self.ap_mac_for_key(str(client["ap_mac"])),
+                "ap_name": self.get_client_ap_name(client),
+                "signal": signal if isinstance(signal, (int, float)) else None,
+            }
+        return None
+
+    def ap_mac_for_key(self, key: str) -> str:
+        """Normalized AP MAC for a client AP key (MAC or integration device id)."""
+        if ":" in key:
+            return normalize_mac(key)
+        return self._ap_id_macs.get(key.lower(), key)
+
     def get_person_zone(self, person_id: str) -> str | None:
         """Return zone hint if available."""
         row = self._presence_by_person.get(person_id)
@@ -1240,8 +1280,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             key = client.get("ap_mac")
             if not key:
                 continue
-            key = str(key)
-            row_key = key if ":" in key else self._ap_id_macs.get(key.lower(), key)
+            row_key = self.ap_mac_for_key(str(key))
             counts[row_key] = counts.get(row_key, 0) + 1
         rows: dict[str, dict[str, Any]] = {}
         for key, name in self._ap_names.items():
