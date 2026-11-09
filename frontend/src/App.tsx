@@ -4,6 +4,7 @@ import Devices from './pages/Devices';
 import Persons from './pages/Persons';
 import UnknownClients from './pages/UnknownClients';
 import AccessPoints from './pages/AccessPoints';
+import Networks from './pages/Networks';
 import { currentToken, embedded, onTokenChange, requestPanelToken, saveToken } from './api';
 import './App.css';
 
@@ -46,6 +47,7 @@ const PAGES = [
   { hash: 'devices', label: 'Devices', element: <Devices /> },
   { hash: 'unknown-clients', label: 'Unknown Clients', element: <UnknownClients /> },
   { hash: 'access-points', label: 'Access Points', element: <AccessPoints /> },
+  { hash: 'networks', label: 'Networks', element: <Networks /> },
 ];
 
 function currentHash(): string {

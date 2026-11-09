@@ -351,6 +351,16 @@ class UniFiDeviceTracker(
         return None
 
     @property
+    def available(self) -> bool:
+        """Unavailable while the device is online only outside the network filter."""
+        if not super().available:
+            return False
+        device = self._current_device() or {}
+        return not self.coordinator.is_device_filtered_out(
+            device.get("id") or self._device_id
+        )
+
+    @property
     def location_name(self) -> str:
         """Return home/not_home for the device."""
         return STATE_HOME if self._is_connected() else STATE_NOT_HOME

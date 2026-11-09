@@ -21,6 +21,8 @@ from yarl import URL
 
 from .api_parser import normalize_mac
 from .const import (
+    CONF_INCLUDE_UNASSIGNED,
+    CONF_NETWORKS,
     DEFAULT_WEBUI_PORT,
     DOMAIN,
     PANEL_ELEMENT,
@@ -31,6 +33,7 @@ from .const import (
     WEBUI_BIND_HOST,
 )
 from .coordinator import UniFiPeoplePointerCoordinator
+from .network_filter import normalize_selection
 from .presence import person_owns_device
 
 _LOGGER = logging.getLogger(__name__)
@@ -101,6 +104,8 @@ class WebUIServer:
         app.router.add_get("/api/clients/unknown", self._unknown_clients)
         app.router.add_post("/api/clients/{mac}/claim", self._claim_client)
         app.router.add_get("/api/access-points", self._access_points)
+        app.router.add_get("/api/networks", self._networks)
+        app.router.add_put("/api/networks", self._save_networks)
         app.router.add_route("*", "/api/{tail:.*}", self._api_not_found)
         app.router.add_get("/{tail:.*}", self._static)
         return app
@@ -184,7 +189,8 @@ class WebUIServer:
 
     async def _overview(self, request: web.Request) -> web.Response:
         persons = self._persons_payload()
-        devices = self._devices_payload()
+        # Devices seen only outside the network filter do not count.
+        devices = [d for d in self._devices_payload() if not d["filtered"]]
         return web.json_response(
             {
                 "persons_home": sum(1 for p in persons if p["state"] == "home"),
@@ -195,6 +201,7 @@ class WebUIServer:
                 "guest_clients": len(self.coordinator.get_guest_clients()),
                 "access_points": len(self.coordinator.get_access_points()),
                 "last_update_success": self.coordinator.last_update_success,
+                "network_filter": self.coordinator.network_filter_labels(),
                 "persons": persons,
             }
         )
@@ -223,6 +230,9 @@ class WebUIServer:
 
     async def _access_points(self, request: web.Request) -> web.Response:
         return web.json_response(self.coordinator.get_access_points())
+
+    async def _networks(self, request: web.Request) -> web.Response:
+        return web.json_response(self.coordinator.get_network_overview())
 
     def _persons_payload(self) -> list[dict[str, Any]]:
         coordinator = self.coordinator
@@ -280,6 +290,7 @@ class WebUIServer:
                         coordinator.get_client_ap_name(client) if online else None
                     ),
                     "last_seen": _iso(client.get("last_seen")),
+                    "filtered": coordinator.is_device_filtered_out(device.get("id")),
                 }
             )
         return rows
@@ -397,6 +408,33 @@ class WebUIServer:
         device = self._device(request.match_info["device_id"])
         await self.coordinator.remove_device(str(device["mac"]))
         return web.Response(status=204)
+
+    async def _save_networks(self, request: web.Request) -> web.Response:
+        """Store the network filter in the entry options and apply it."""
+        body = await self._json_body(request)
+        values = body.get(CONF_NETWORKS, [])
+        if not isinstance(values, list):
+            raise web.HTTPBadRequest(text=f"{CONF_NETWORKS} must be a list")
+        try:
+            selection = normalize_selection(values)
+        except ValueError as err:
+            raise web.HTTPBadRequest(text=str(err)) from err
+        include = body.get(CONF_INCLUDE_UNASSIGNED, True)
+        if not isinstance(include, bool):
+            raise web.HTTPBadRequest(
+                text=f"{CONF_INCLUDE_UNASSIGNED} must be a boolean"
+            )
+        entry = self.coordinator.config_entry
+        options = {
+            **entry.options,
+            CONF_NETWORKS: selection,
+            CONF_INCLUDE_UNASSIGNED: include,
+        }
+        self.hass.config_entries.async_update_entry(entry, options=options)
+        # Apply now so the response already reflects the new filter; the
+        # entry update listener sees nothing left to do.
+        await self.coordinator.async_apply_network_options(options)
+        return web.json_response(self.coordinator.get_network_overview())
 
     async def _claim_client(self, request: web.Request) -> web.Response:
         mac = normalize_mac(request.match_info["mac"])

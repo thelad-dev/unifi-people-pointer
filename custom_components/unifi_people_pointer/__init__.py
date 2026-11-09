@@ -10,11 +10,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
 from .const import (
+    CONF_INCLUDE_UNASSIGNED,
+    CONF_NETWORKS,
     CONF_WEBUI_PORT,
     DEFAULT_EVENT_DEBOUNCE,
+    DEFAULT_INCLUDE_UNASSIGNED,
+    DEFAULT_POLL_INTERVAL,
     DEFAULT_WEBUI_PORT,
     DOMAIN,
     ISSUE_WEBUI_PORT,
+    NETWORK_FILTER_OPTIONS,
 )
 from .coordinator import UniFiPeoplePointerCoordinator
 from .events import UniFiEventManager
@@ -78,6 +83,8 @@ async def _async_finish_setup(
         "coordinator": coordinator,
         "webui": webui,
         "webui_url": await async_webui_url(hass, port) if webui.running else None,
+        # Options this setup runs with; filter-only changes skip the reload.
+        "options": dict(entry.options),
     }
     # Services resolve the active coordinator here.
     hass.data[DOMAIN]["coordinator"] = coordinator
@@ -113,8 +120,40 @@ async def _async_setup_panel(hass: HomeAssistant, port: int) -> None:
         _LOGGER.exception("Could not register the UniFi People Pointer panel")
 
 
+# Values an option has while it is not stored (the options form fills them in).
+_OPTION_DEFAULTS = {
+    "scan_interval": DEFAULT_POLL_INTERVAL,
+    CONF_WEBUI_PORT: DEFAULT_WEBUI_PORT,
+    CONF_NETWORKS: [],
+    CONF_INCLUDE_UNASSIGNED: DEFAULT_INCLUDE_UNASSIGNED,
+}
+
+
+def _changed_options(old: dict, new: dict) -> set[str]:
+    """Option keys whose effective value differs between two option dicts."""
+    return {
+        key
+        for key in old.keys() | new.keys()
+        if old.get(key, _OPTION_DEFAULTS.get(key))
+        != new.get(key, _OPTION_DEFAULTS.get(key))
+    }
+
+
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle options update."""
+    """Handle options update.
+
+    A change of the network filter only is applied live, so the web UI that
+    saved it keeps serving; every other option change reloads the entry.
+    """
+    runtime = hass.data.get(DOMAIN, {}).get(entry.entry_id) or {}
+    coordinator = runtime.get("coordinator")
+    applied = runtime.get("options")
+    if coordinator is not None and applied is not None:
+        changed = _changed_options(applied, dict(entry.options))
+        if changed <= set(NETWORK_FILTER_OPTIONS):
+            runtime["options"] = dict(entry.options)
+            await coordinator.async_apply_network_options(entry.options)
+            return
     await hass.config_entries.async_reload(entry.entry_id)
 
 

@@ -95,6 +95,10 @@ function Devices() {
                   <td>
                     {d.online ? (
                       <span className="badge badge-success">{d.ap_name ? `AP: ${d.ap_name}` : 'Online'}</span>
+                    ) : d.filtered ? (
+                      <span className="badge badge-neutral" title="Online in a network outside the network filter">
+                        Outside filter
+                      </span>
                     ) : (
                       <span className="badge badge-neutral">Away</span>
                     )}

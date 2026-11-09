@@ -57,10 +57,10 @@ def threaded_dns_resolver():
 
 @pytest.fixture(autouse=True)
 def no_unifi_network_side_calls(request):
-    """Keep setup tests offline: no AP device list fetch, no web UI socket.
+    """Keep setup tests offline: no AP/network list fetch, no web UI socket.
 
     Tests that exercise these paths mark themselves with ``real_webui`` /
-    ``real_ap_fetch``.
+    ``real_ap_fetch`` / ``real_network_fetch``.
     """
     from unittest.mock import patch
 
@@ -71,6 +71,14 @@ def no_unifi_network_side_calls(request):
                 "custom_components.unifi_people_pointer.coordinator."
                 "UniFiPeoplePointerCoordinator._fetch_access_points",
                 AsyncMock(return_value={}),
+            )
+        )
+    if "real_network_fetch" not in request.keywords:
+        patches.append(
+            patch(
+                "custom_components.unifi_people_pointer.coordinator."
+                "UniFiPeoplePointerCoordinator._fetch_networks",
+                AsyncMock(return_value=[]),
             )
         )
     if "real_webui" not in request.keywords:

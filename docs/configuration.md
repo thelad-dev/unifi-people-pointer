@@ -299,6 +299,28 @@ logger:
     custom_components.unifi_people_pointer: debug
 ```
 
+#### Netzfilter
+
+Legt fest, aus welchen Netzen Clients zählen. Gespeichert in den Optionen des Config-Eintrags; die Web-UI-Seite **Networks** und **Konfigurieren** (Options-Flow) bearbeiten dieselbe Einstellung.
+
+| Option | Bedeutung | Standard |
+|---|---|---|
+| `networks` | Liste aus Subnetzen in CIDR-Schreibweise (`192.0.2.0/24`, `2001:db8::/64`) und UniFi-Netzwerken (`network:<id>`) | leer = kein Filter |
+| `include_unassigned_clients` | Clients ohne IP-Adresse und ohne UniFi-Netzwerk zählen mit | `true` |
+
+Zuordnung eines Clients, sobald `networks` nicht leer ist:
+
+1. Liegt eine seiner Adressen (IPv4 oder IPv6) in einem gewählten Subnetz oder im Subnetz eines gewählten UniFi-Netzwerks, zählt er.
+2. Sonst zählt er, wenn sein UniFi-Netzwerk (`network_id`, ersatzweise der Netzwerkname) gewählt ist. So werden auch Clients ohne IP zugeordnet.
+3. Meldet er weder Adresse noch Netzwerk, entscheidet `include_unassigned_clients`.
+4. Alle anderen Clients fallen heraus.
+
+Die UniFi-Netzwerke liest die Integration alle 10 Minuten aus `rest/networkconf` (ersatzweise Integration-API `/v1/sites/{id}/networks`). Ohne diese Liste zeigt die Auswahl die tatsächlich auftretenden Adressbereiche (IPv4 /24, IPv6 /64) und die Netzwerke, die die Clients selbst melden.
+
+Wirkung: Der Filter greift direkt nach dem Abruf der Clients. Anwesenheit, Geräte, unbekannte und Gast-Clients, Clientzahlen der Access Points, Tracker und Ereignisse sehen nur noch Clients aus den gewählten Netzen. Ein eingerichtetes Gerät, das nur außerhalb online ist, wird als Tracker `unavailable`; `devices.json` und `people.json` bleiben unverändert. Ändern sich nur diese beiden Optionen, wird der Filter sofort angewendet, ohne die Integration neu zu laden.
+
+Web-API (Admin-Token wie alle Endpunkte): `GET /api/networks` liefert Auswahl und erkannte Netze mit Clientzahl, `PUT /api/networks` mit `{"networks": [...], "include_unassigned_clients": true}` speichert; ungültige Einträge werden mit HTTP 400 abgelehnt.
+
 #### Mehrere UniFi-Sites
 
 Aktuell eine Site (Standard-Site). Multi-Site ist nicht implementiert.
@@ -617,6 +639,28 @@ logger:
   logs:
     custom_components.unifi_people_pointer: debug
 ```
+
+#### Network filter
+
+Decides which networks clients count from. Stored in the config entry options; the web UI page **Networks** and **Configure** (options flow) edit the same setting.
+
+| Option | Meaning | Default |
+|---|---|---|
+| `networks` | List of subnets in CIDR notation (`192.0.2.0/24`, `2001:db8::/64`) and UniFi networks (`network:<id>`) | empty = no filter |
+| `include_unassigned_clients` | Count clients that report neither an IP address nor a UniFi network | `true` |
+
+How a client is matched once `networks` is not empty:
+
+1. If one of its addresses (IPv4 or IPv6) lies in a selected subnet or in the subnet of a selected UniFi network, it counts.
+2. Otherwise it counts when its UniFi network (`network_id`, or the network name) is selected. This also covers clients without an IP address.
+3. If it reports neither an address nor a network, `include_unassigned_clients` decides.
+4. Every other client is dropped.
+
+The integration reads the UniFi networks every 10 minutes from `rest/networkconf` (or the integration API `/v1/sites/{id}/networks`). Without that list the selection offers the address ranges clients actually use (IPv4 /24, IPv6 /64) and the networks clients report themselves.
+
+Effect: the filter applies right after the clients are fetched. Presence, devices, unknown and guest clients, access point client counts, trackers and events only see clients from the selected networks. A configured device that is online only outside turns its tracker `unavailable`; `devices.json` and `people.json` stay untouched. When only these two options change, the filter applies immediately without reloading the integration.
+
+Web API (admin token like every endpoint): `GET /api/networks` returns the selection and detected networks with client counts, `PUT /api/networks` with `{"networks": [...], "include_unassigned_clients": true}` saves it; invalid entries are rejected with HTTP 400.
 
 #### Multiple UniFi Sites
 

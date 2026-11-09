@@ -109,6 +109,8 @@ export interface Device {
   ap_mac: string | null;
   ap_name: string | null;
   last_seen: string | null;
+  // Online only in a network outside the network filter.
+  filtered: boolean;
 }
 
 export interface UnknownClient {
@@ -136,7 +138,28 @@ export interface Overview {
   guest_clients: number;
   access_points: number;
   last_update_success: boolean;
+  // Selected networks; empty when every network is shown.
+  network_filter: string[];
   persons: Person[];
+}
+
+export interface DetectedNetwork {
+  // CIDR or "network:<UniFi network id>"; also the value stored when selected.
+  key: string;
+  kind: 'unifi' | 'observed' | 'custom';
+  name: string;
+  vlan: number | null;
+  subnets: string[];
+  clients: number;
+  selected: boolean;
+}
+
+export interface NetworkSettings {
+  selected: string[];
+  include_unassigned_clients: boolean;
+  active: boolean;
+  networks: DetectedNetwork[];
+  unassigned_clients: number;
 }
 
 export const DEVICE_TYPES = ['smartphone', 'tablet', 'laptop', 'watch', 'wearable', 'other'];

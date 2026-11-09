@@ -21,6 +21,7 @@ UniFi People Pointer ist eine fortschrittliche Home Assistant Integration, die P
 - **HACS**: Installation als Custom Repository (noch nicht im HACS Default Store)
 - **Access Points**: Tracker zeigen den AP, an dem ein Gerät hängt, z. B. `Phone AP: Living-Room`
 - **Web-UI**: Wird mit der Integration installiert, Seitenleisten-Eintrag "People Pointer"
+- **Netzfilter**: Nur Clients aus gewählten Subnetzen oder UniFi-Netzwerken berücksichtigen
 
 #### 🚀 Installation
 
@@ -58,6 +59,7 @@ Hinweis: Frühere 404-Fehler beim Hinzufügen lagen oft am damals privaten Repo.
 
 4. Optional unter **Optionen konfigurieren**:
    - **Scan-Intervall**: Wie oft nach Geräten gesucht wird (Standard: 45s, Bereich 10–600)
+   - **Netze**: Welche Subnetze oder UniFi-Netzwerke zählen (Standard: alle), siehe [Netzfilter](#-netzfilter)
 
 #### 📱 Personen & Geräte einrichten
 
@@ -128,9 +130,21 @@ Manuelle Änderungen an `people.json` / `devices.json` greift der nächste Poll 
 
 Solange ein Gerät verbunden ist, heißt sein Tracker `<Name> AP: <AP-Name>` (z. B. `Phone AP: Living-Room`), der Personen-Tracker zeigt den AP des ersten verbundenen Geräts. Der AP-Name kommt aus der UniFi-Geräteliste und folgt beim Roaming mit dem nächsten Poll. Zusätzlich gibt es das Attribut `ap_name` (Tracker und je Client in den Unknown-/Guest-Sensoren). Die Entity-IDs bleiben unverändert; ein in HA vergebener eigener Anzeigename ersetzt den Zusatz.
 
+#### 🌐 Netzfilter
+
+Hängen am Controller mehrere Netze (z. B. ein Gäste- oder Nachbarnetz neben dem eigenen Hauptnetz), lässt sich festlegen, welche davon People Pointer auswertet. Auswahl in der Web-UI unter **Networks** oder unter **Optionen konfigurieren** (beides dieselbe Einstellung):
+
+- Erkannte Netze erscheinen mit der Zahl ihrer Clients: UniFi-Netzwerke/VLANs aus dem Controller und tatsächlich auftretende Adressbereiche (IPv4 als /24, IPv6 als /64). Weitere Subnetze lassen sich in CIDR-Schreibweise eintragen, z. B. `192.0.2.0/24` oder `2001:db8::/64`.
+- Ohne Auswahl gilt kein Filter, alles bleibt sichtbar (Standard, auch nach dem Update bestehender Installationen).
+- Mit Auswahl zählen nur Clients in diesen Netzen: Übersicht, Personen, Geräte, unbekannte Clients, Clientzahlen der Access Points, Tracker und Ereignisse. Für Geräte außerhalb gibt es keine `unknown_device`-Meldung.
+- Clients ohne IP werden über ihr UniFi-Netzwerk zugeordnet; melden sie weder IP noch Netzwerk, entscheidet **Clients ohne Netz anzeigen** (Standard: ja).
+- Ein eingerichtetes Gerät, das nur außerhalb der Auswahl online ist, wird als Tracker *nicht verfügbar* und in der Web-UI als "Outside filter" gezeigt. Gerät und Personenzuordnung bleiben erhalten.
+
+Die Änderung wirkt sofort, ohne die Integration neu zu laden. Details: [docs/configuration.md](docs/configuration.md#netzfilter).
+
 #### 🔧 Web-UI
 
-Die Web-UI ist Teil der Integration, eine Zusatzinstallation gibt es nicht. Sie startet mit dem Config-Entry, lauscht auf `0.0.0.0` (Standardport `8765`, änderbar unter Optionen) und erscheint für Admins als Seitenleisten-Eintrag **People Pointer**; auf der Integrationsseite führt der Link **Besuchen** am Gerät "UniFi People Pointer" dorthin. Sie bietet Übersicht, Personen, Geräte, unbekannte Clients (beanspruchen) und Access Points. Jede API-Anfrage braucht das HA-Token eines Admins (im Panel automatisch, direkt aufgerufen ein Long-Lived Token). Ist der Port belegt, erscheint ein Hinweis unter Reparaturen. Details: [docs/installation.md](docs/installation.md#web-ui).
+Die Web-UI ist Teil der Integration, eine Zusatzinstallation gibt es nicht. Sie startet mit dem Config-Entry, lauscht auf `0.0.0.0` (Standardport `8765`, änderbar unter Optionen) und erscheint für Admins als Seitenleisten-Eintrag **People Pointer**; auf der Integrationsseite führt der Link **Besuchen** am Gerät "UniFi People Pointer" dorthin. Sie bietet Übersicht, Personen, Geräte, unbekannte Clients (beanspruchen), Access Points und die Netzauswahl. Jede API-Anfrage braucht das HA-Token eines Admins (im Panel automatisch, direkt aufgerufen ein Long-Lived Token). Ist der Port belegt, erscheint ein Hinweis unter Reparaturen. Details: [docs/installation.md](docs/installation.md#web-ui).
 
 #### 📋 Anforderungen
 
@@ -166,6 +180,7 @@ UniFi People Pointer is an advanced Home Assistant integration that tracks peopl
 - **HACS**: Install via custom repository (not yet in the HACS default store)
 - **Access points**: Trackers show the AP a device is connected to, e.g. `Phone AP: Living-Room`
 - **Web UI**: Installed with the integration, sidebar entry "People Pointer"
+- **Network filter**: Only count clients from selected subnets or UniFi networks
 
 #### 🚀 Installation
 
@@ -203,6 +218,7 @@ Note: Earlier 404 errors when adding the repository were often caused by the rep
 
 4. Optionally under **Configure**:
    - **Scan interval**: How often to scan for devices (default: 45s, range 10–600)
+   - **Networks**: Which subnets or UniFi networks count (default: all), see [Network filter](#-network-filter)
 
 #### 📱 Setting up People & Devices
 
@@ -273,9 +289,21 @@ Manual edits to `people.json` / `devices.json` are picked up on the next poll (n
 
 While a device is connected its tracker is named `<name> AP: <AP name>` (e.g. `Phone AP: Living-Room`); person trackers show the AP of their first connected device. The AP name comes from the UniFi device list and follows roaming on the next poll. The `ap_name` attribute is also set (trackers, and per client in the unknown/guest sensors). Entity ids do not change; a custom name set in HA replaces the suffix.
 
+#### 🌐 Network filter
+
+When the controller serves several networks (say a guest or neighbour network next to your own main network), choose which of them People Pointer looks at. Pick them in the web UI under **Networks** or under **Configure** in the integration options (both edit the same setting):
+
+- Detected networks are listed with their client count: UniFi networks/VLANs from the controller and the address ranges clients actually use (IPv4 as /24, IPv6 as /64). Further subnets can be typed in CIDR notation, e.g. `192.0.2.0/24` or `2001:db8::/64`.
+- With nothing selected there is no filter and everything stays visible (the default, also for existing installations after the update).
+- With a selection only clients in those networks count: overview, persons, devices, unknown clients, access point client counts, trackers and events. Devices outside raise no `unknown_device` event.
+- Clients without an IP address are matched by their UniFi network; clients that report neither follow **Show clients without a network** (default: yes).
+- A configured device that is online only outside the selection turns its tracker *unavailable* and shows as "Outside filter" in the web UI. The device and its person assignment are kept.
+
+Changes apply right away, without reloading the integration. Details: [docs/configuration.md](docs/configuration.md#network-filter).
+
 #### 🔧 Web UI
 
-The web UI ships with the integration; there is nothing extra to install. It starts with the config entry, listens on `0.0.0.0` (default port `8765`, configurable in the options) and shows up for admins as the sidebar entry **People Pointer**; on the integration page the **Visit** link on the "UniFi People Pointer" device leads there. It offers an overview, persons, devices, unknown clients (claim) and access points. Every API request needs an admin's Home Assistant token (handed over automatically inside the panel, a long-lived token when opened directly). If the port is taken, a repair issue says so. Details: [docs/installation.md](docs/installation.md#web-ui-1).
+The web UI ships with the integration; there is nothing extra to install. It starts with the config entry, listens on `0.0.0.0` (default port `8765`, configurable in the options) and shows up for admins as the sidebar entry **People Pointer**; on the integration page the **Visit** link on the "UniFi People Pointer" device leads there. It offers an overview, persons, devices, unknown clients (claim), access points and the network selection. Every API request needs an admin's Home Assistant token (handed over automatically inside the panel, a long-lived token when opened directly). If the port is taken, a repair issue says so. Details: [docs/installation.md](docs/installation.md#web-ui-1).
 
 #### 📋 Requirements
 

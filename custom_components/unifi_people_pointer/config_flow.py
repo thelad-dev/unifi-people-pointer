@@ -14,8 +14,16 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_TOKEN
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .const import (
+    CONF_INCLUDE_UNASSIGNED,
+    CONF_NETWORKS,
     CONF_WEBUI_PORT,
     DEFAULT_VERIFY_SSL,
     DEFAULT_WEBUI_PORT,
@@ -23,6 +31,7 @@ from .const import (
     MAX_WEBUI_PORT,
     MIN_WEBUI_PORT,
 )
+from .network_filter import detect_networks, normalize_selection
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -272,21 +281,72 @@ class UniFiPeoplePointerOptionsFlow(config_entries.OptionsFlow):
         """Initialize options flow."""
         self._config_entry = config_entry
 
+    def _network_choices(self) -> list[SelectOptionDict]:
+        """Detected networks with client counts, including the stored selection."""
+        runtime = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
+        coordinator = (runtime or {}).get("coordinator")
+        if coordinator is not None:
+            rows = coordinator.get_network_overview()["networks"]
+        else:
+            # Entry not loaded: offer what is stored (invalid entries dropped).
+            stored = []
+            for value in self._config_entry.options.get(CONF_NETWORKS) or []:
+                try:
+                    stored.extend(normalize_selection([value]))
+                except ValueError:
+                    continue
+            rows = detect_networks([], [], stored)["networks"]
+        choices: list[SelectOptionDict] = []
+        for row in rows:
+            label = str(row["name"])
+            subnets = [s for s in row["subnets"] if s != label]
+            if subnets:
+                label += f" ({', '.join(subnets)})"
+            if row.get("vlan"):
+                label += f", VLAN {row['vlan']}"
+            label += f" - {row['clients']} clients"
+            choices.append(SelectOptionDict(value=str(row["key"]), label=label))
+        return choices
+
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
+        errors: dict[str, str] = {}
+        options = self._config_entry.options
+        selection = list(options.get(CONF_NETWORKS) or [])
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            try:
+                selection = normalize_selection(user_input.get(CONF_NETWORKS) or [])
+            except ValueError:
+                errors[CONF_NETWORKS] = "invalid_network"
+                selection = [str(v) for v in user_input.get(CONF_NETWORKS) or [] if v]
+            else:
+                return self.async_create_entry(
+                    title="",
+                    # Keep options the form does not show (e.g. event_debounce).
+                    data={
+                        **options,
+                        **user_input,
+                        CONF_NETWORKS: selection,
+                        CONF_INCLUDE_UNASSIGNED: bool(
+                            user_input.get(
+                                CONF_INCLUDE_UNASSIGNED,
+                                options.get(CONF_INCLUDE_UNASSIGNED, True),
+                            )
+                        ),
+                    },
+                )
 
-        current = self._config_entry.options.get(
-            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-        )
-        current_port = self._config_entry.options.get(
-            CONF_WEBUI_PORT, DEFAULT_WEBUI_PORT
-        )
+        current = options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        current_port = options.get(CONF_WEBUI_PORT, DEFAULT_WEBUI_PORT)
+        if user_input is not None:
+            current = user_input.get(CONF_SCAN_INTERVAL, current)
+            current_port = user_input.get(CONF_WEBUI_PORT, current_port)
+        include = bool((user_input or options).get(CONF_INCLUDE_UNASSIGNED, True))
         return self.async_show_form(
             step_id="init",
+            errors=errors,
             data_schema=vol.Schema(
                 {
                     vol.Optional(
@@ -303,6 +363,15 @@ class UniFiPeoplePointerOptionsFlow(config_entries.OptionsFlow):
                         vol.Coerce(int),
                         vol.Range(min=MIN_WEBUI_PORT, max=MAX_WEBUI_PORT),
                     ),
+                    vol.Optional(CONF_NETWORKS, default=selection): SelectSelector(
+                        SelectSelectorConfig(
+                            options=self._network_choices(),
+                            multiple=True,
+                            custom_value=True,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    vol.Optional(CONF_INCLUDE_UNASSIGNED, default=include): bool,
                 }
             ),
         )

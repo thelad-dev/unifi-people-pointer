@@ -25,7 +25,10 @@ from .api_parser import (
 )
 from .const import (
     AP_NAMES_REFRESH_SECONDS,
+    CONF_INCLUDE_UNASSIGNED,
+    CONF_NETWORKS,
     CONF_VERIFY_SSL,
+    DEFAULT_INCLUDE_UNASSIGNED,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_VERIFY_SSL,
     DEVICES_FILE,
@@ -35,6 +38,7 @@ from .const import (
     EVENT_PERSON_LEFT,
     EVENT_UNKNOWN_DEVICE,
     MANUFACTURERS_FILE,
+    NETWORKS_REFRESH_SECONDS,
     PEOPLE_FILE,
     STATE_AWAY,
     STATE_HOME,
@@ -49,9 +53,36 @@ from .device_matcher import (
     normalize_hostname_match,
     partial_matching_devices,
 )
+from .network_filter import (
+    NetworkFilter,
+    UniFiNetwork,
+    detect_networks,
+    normalize_entry,
+    parse_networks,
+)
 from .presence import _online_device_ids, determine_presence, person_owns_device
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def network_options(options: Any) -> tuple[list[str], bool]:
+    """Return ``(selection, include_unassigned)`` from config entry options.
+
+    Invalid stored entries are skipped (and logged) instead of failing setup.
+    """
+    selection: list[str] = []
+    for value in (options or {}).get(CONF_NETWORKS) or []:
+        try:
+            entry = normalize_entry(value)
+        except ValueError as err:
+            _LOGGER.warning("Ignoring network filter entry: %s", err)
+            continue
+        if entry not in selection:
+            selection.append(entry)
+    include = bool(
+        (options or {}).get(CONF_INCLUDE_UNASSIGNED, DEFAULT_INCLUDE_UNASSIGNED)
+    )
+    return selection, include
 
 
 def _host_for_url(host: str) -> str:
@@ -96,7 +127,17 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             people_path=storage / PEOPLE_FILE,
         )
         self._clients_by_mac: dict[str, dict[str, Any]] = {}
+        # Clients inside the network filter; everything below works on these.
         self._all_clients: list[dict[str, Any]] = []
+        # Last parsed client list before the network filter.
+        self._unfiltered_clients: list[dict[str, Any]] = []
+        self._network_selection, self._include_unassigned = network_options(
+            config_entry.options
+        )
+        self._networks: list[UniFiNetwork] = []
+        self._networks_fetched_at: float = 0.0
+        # Configured devices online, but only in networks outside the filter.
+        self._filtered_out_device_ids: set[str] = set()
         self._online_device_ids_cache: set[str] = set()
         self._devices_by_id: dict[str, dict[str, Any]] = {}
         self._device_by_configured_mac: dict[str, dict[str, Any]] = {}
@@ -137,7 +178,14 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self,
         all_clients: list[dict[str, Any]],
     ) -> dict[str, Any]:
-        """Recompute presence indexes from config + client snapshot."""
+        """Recompute presence indexes from config + client snapshot.
+
+        ``all_clients`` is the unfiltered client list; clients outside the
+        selected networks are dropped here, before anything else sees them.
+        """
+        self._unfiltered_clients = all_clients
+        network_filter = self.network_filter
+        all_clients = network_filter.apply(all_clients)
         wireless = filter_wireless_only(all_clients)
         self._all_clients = all_clients
         self._clients_by_mac = {c["mac"]: c for c in all_clients if c.get("mac")}
@@ -165,6 +213,15 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._presence_by_person = {row["id"]: row for row in presence_rows}
         now_online_ids = _online_device_ids(devices, all_clients)
         self._online_device_ids_cache = now_online_ids
+        self._filtered_out_device_ids = (
+            {
+                str(device_id)
+                for device_id in _online_device_ids(devices, self._unfiltered_clients)
+                - now_online_ids
+            }
+            if network_filter.active
+            else set()
+        )
 
         unknown = []
         known_macs = set(self._device_by_configured_mac)
@@ -333,6 +390,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if raw_clients is not None:
             await self._async_refresh_ap_names(raw_clients)
+            await self._async_refresh_networks()
 
         auth_failed = False
         async with self._config_lock:
@@ -340,8 +398,12 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if raw_clients is not None:
                 all_clients = deduplicate_clients(parse_clients(raw_clients))
                 data = self._rebuild_presence_state(all_clients)
-            elif self._all_clients or self._clients_by_mac or self._presence_by_person:
-                data = self._rebuild_presence_state(list(self._all_clients))
+            elif (
+                self._unfiltered_clients
+                or self._clients_by_mac
+                or self._presence_by_person
+            ):
+                data = self._rebuild_presence_state(list(self._unfiltered_clients))
                 auth_failed = isinstance(fetch_error, PermissionError)
             else:
                 raise UpdateFailed(
@@ -522,6 +584,113 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             rows = rows if isinstance(rows, list) else []
             self._ap_id_macs = parse_access_point_ids(rows)
             return parse_access_point_names(rows)
+
+    async def _async_refresh_networks(self) -> None:
+        """Refresh UniFi network definitions; keep the last list on failure."""
+        if (
+            self._networks_fetched_at
+            and time.monotonic() - self._networks_fetched_at < NETWORKS_REFRESH_SECONDS
+        ):
+            return
+        try:
+            self._networks = await self._fetch_networks()
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("UniFi network list for the network filter failed: %s", err)
+        self._networks_fetched_at = time.monotonic()
+
+    async def _fetch_networks(self) -> list[UniFiNetwork]:
+        """Fetch the LAN/VLAN networks defined on the controller."""
+        host = str(self.config_entry.data[CONF_HOST])
+        token = str(self.config_entry.data[CONF_TOKEN])
+        verify_ssl = bool(
+            self.config_entry.data.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL)
+        )
+        ssl_param: bool | object = verify_ssl if verify_ssl else False
+        base = f"https://{_host_for_url(host)}"
+        headers = {"Accept": "application/json", "X-API-KEY": token}
+        timeout = aiohttp.ClientTimeout(total=20)
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            for source in ("classic", "integration"):
+                if source == "classic":
+                    url = (
+                        f"{base}/proxy/network/api/s/{self._site_key}/rest/networkconf"
+                    )
+                else:
+                    if not self._site_id:
+                        self._site_id, self._site_key = await self._resolve_site(
+                            session, base, headers, ssl_param
+                        )
+                    url = (
+                        f"{base}/proxy/network/integration/v1/sites/{self._site_id}"
+                        "/networks?limit=200"
+                    )
+                try:
+                    async with session.get(
+                        url, headers=headers, ssl=ssl_param
+                    ) as response:
+                        if response.status >= 400:
+                            continue
+                        payload = await response.json(content_type=None)
+                except (
+                    aiohttp.ClientError,
+                    asyncio.TimeoutError,
+                    ValueError,
+                    TypeError,
+                ) as err:
+                    _LOGGER.debug("UniFi %s networks endpoint failed: %s", source, err)
+                    continue
+                rows = payload.get("data") if isinstance(payload, dict) else payload
+                networks = parse_networks(rows if isinstance(rows, list) else [])
+                if networks:
+                    return networks
+        raise ConnectionError("UniFi returned no network definitions")
+
+    @property
+    def network_filter(self) -> NetworkFilter:
+        """The network filter for the current options and known networks."""
+        return NetworkFilter(
+            self._network_selection, self._include_unassigned, self._networks
+        )
+
+    def get_network_overview(self) -> dict[str, Any]:
+        """Selection plus the networks clients appear in (unfiltered counts)."""
+        detected = detect_networks(
+            self._unfiltered_clients, self._networks, self._network_selection
+        )
+        return {
+            "selected": list(self._network_selection),
+            "include_unassigned_clients": self._include_unassigned,
+            "active": bool(self._network_selection),
+            **detected,
+        }
+
+    def network_filter_labels(self) -> list[str]:
+        """Readable names of the selected networks (for UI hints)."""
+        names = {net.id: net.name for net in self._networks}
+        labels = []
+        for entry in self._network_selection:
+            if entry.startswith("network:"):
+                labels.append(names.get(entry[len("network:") :], entry))
+            else:
+                labels.append(entry)
+        return labels
+
+    def is_device_filtered_out(self, device_id: str | None) -> bool:
+        """True when a configured device is online only outside the filter."""
+        return bool(device_id) and str(device_id) in self._filtered_out_device_ids
+
+    async def async_apply_network_options(self, options: Any) -> None:
+        """Apply changed network filter options live (no entry reload)."""
+        selection, include = network_options(options)
+        if selection == self._network_selection and include == self._include_unassigned:
+            return
+        async with self._config_lock:
+            self._network_selection = selection
+            self._include_unassigned = include
+            data = self._rebuild_presence_state(list(self._unfiltered_clients))
+            self.async_set_updated_data(data)
+        await self.async_sync_tracker_entities()
 
     def get_ap_name(self, ap_mac: str | None) -> str | None:
         """Return the UniFi device name for an AP MAC (or integration device id)."""
@@ -759,7 +928,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._assign_device_sync, mac, person, device_type, device_name
             )
             self._loader.reload()
-            data = self._rebuild_presence_state(list(self._all_clients))
+            data = self._rebuild_presence_state(list(self._unfiltered_clients))
             self.async_set_updated_data(data)
         await self.async_sync_tracker_entities()
         await self.async_request_refresh()
@@ -883,7 +1052,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._track_device_sync, mac, name, device_type
             )
             self._loader.reload()
-            data = self._rebuild_presence_state(list(self._all_clients))
+            data = self._rebuild_presence_state(list(self._unfiltered_clients))
             self.async_set_updated_data(data)
         await self.async_sync_tracker_entities()
         await self.async_request_refresh()
@@ -921,7 +1090,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         async with self._config_lock:
             await self.hass.async_add_executor_job(self._remove_device_sync, mac)
             self._loader.reload()
-            data = self._rebuild_presence_state(list(self._all_clients))
+            data = self._rebuild_presence_state(list(self._unfiltered_clients))
             self.async_set_updated_data(data)
         await self.async_sync_tracker_entities()
         await self.async_request_refresh()
@@ -974,7 +1143,7 @@ class UniFiPeoplePointerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         async with self._config_lock:
             result = await self.hass.async_add_executor_job(sync_fn, *args)
             await self.hass.async_add_executor_job(self._loader.reload)
-            data = self._rebuild_presence_state(list(self._all_clients))
+            data = self._rebuild_presence_state(list(self._unfiltered_clients))
             self.async_set_updated_data(data)
         await self.async_sync_tracker_entities()
         return result

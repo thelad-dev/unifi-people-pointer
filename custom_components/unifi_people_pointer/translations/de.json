@@ -35,12 +35,21 @@
     "step": {
       "init": {
         "title": "UniFi People Pointer Optionen",
-        "description": "Konfiguriere Polling und Event Einstellungen",
+        "description": "Polling, Port der Web-UI und die Netze, die People Pointer auswertet",
         "data": {
           "scan_interval": "Scan-Intervall (Sekunden)",
-          "webui_port": "Port der Web-UI (lauscht auf allen Schnittstellen)"
+          "webui_port": "Port der Web-UI (lauscht auf allen Schnittstellen)",
+          "networks": "Netze (Subnetze oder UniFi-Netzwerke)",
+          "include_unassigned_clients": "Clients ohne Netz anzeigen"
+        },
+        "data_description": {
+          "networks": "Nur Clients in diesen Netzen zählen: Anwesenheit, Geräte, unbekannte Clients, Clientzahlen der Access Points und Ereignisse. Erkannte Netze auswählen oder ein Subnetz in CIDR-Schreibweise eintippen (z. B. 192.0.2.0/24 oder 2001:db8::/64). Leer lassen, um alle Netze zu zeigen.",
+          "include_unassigned_clients": "Clients, die weder eine IP-Adresse noch ein UniFi-Netzwerk melden. Wirkt nur, solange Netze ausgewählt sind."
         }
       }
+    },
+    "error": {
+      "invalid_network": "Ungültiges Netz. CIDR-Schreibweise verwenden, z. B. 192.0.2.0/24 oder 2001:db8::/64."
     }
   },
   "issues": {

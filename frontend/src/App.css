@@ -213,3 +213,130 @@
     align-items: flex-start;
   }
 }
+
+.page-header a {
+  color: var(--accent);
+}
+
+/* Networks page */
+.filter-status {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  color: var(--text-secondary);
+}
+
+.filter-status-on {
+  border-left-color: var(--accent);
+  color: var(--text);
+}
+
+.network-list {
+  list-style: none;
+}
+
+.network-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.network-row {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.75rem;
+  padding: 0.75rem 0;
+  cursor: pointer;
+}
+
+.network-row input[type='checkbox'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--primary-light);
+  cursor: pointer;
+}
+
+.network-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.network-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.network-meta {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.network-count {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* A card holding a single option row needs no extra row padding. */
+.card > .network-list:only-child .network-row {
+  padding: 0;
+}
+
+.cidr-form {
+  margin-top: 0.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.cidr-form label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text-secondary);
+}
+
+.cidr-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cidr-input-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cidr-input-row input[aria-invalid='true'] {
+  border-color: var(--error);
+}
+
+.field-error {
+  color: #ff8a80;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.network-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+/* Same height for filled and outlined buttons in one row. */
+.network-actions button:not(.button-secondary) {
+  border: 1px solid transparent;
+}
+
+.network-actions .field-error {
+  margin-top: 0;
+}
+
+.save-ok {
+  color: var(--success);
+  font-size: 0.875rem;
+}

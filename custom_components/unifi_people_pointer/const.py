@@ -18,6 +18,8 @@ CONF_ENABLE_OUI_UPDATE = "enable_oui_update"
 CONF_OUI_UPDATE_INTERVAL = "oui_update_interval"
 CONF_OUI_SOURCE = "oui_source"
 CONF_WEBUI_PORT = "webui_port"
+CONF_NETWORKS = "networks"
+CONF_INCLUDE_UNASSIGNED = "include_unassigned_clients"
 
 # Default Values
 DEFAULT_SITE_ID = "default"
@@ -32,6 +34,10 @@ DEFAULT_OUI_UPDATE_INTERVAL = "monthly"
 DEFAULT_OUI_SOURCE = "https://standards-oui.ieee.org/oui/oui.txt"
 
 DEFAULT_WEBUI_PORT = 8765
+# Network filter: no selection means every network is shown.
+DEFAULT_INCLUDE_UNASSIGNED = True
+# Options a change of which is applied live, without reloading the entry.
+NETWORK_FILTER_OPTIONS = (CONF_NETWORKS, CONF_INCLUDE_UNASSIGNED)
 
 # Web UI (bundled, served by the integration on all interfaces)
 WEBUI_BIND_HOST = "0.0.0.0"  # nosec B104 - LAN UI, API requires an HA token
@@ -95,6 +101,8 @@ OUI_VENDORS_FILE = "oui_vendors.json"
 # AP names: re-fetch the UniFi device list at least this often (seconds),
 # and immediately when a client reports an AP that is not in the map yet.
 AP_NAMES_REFRESH_SECONDS = 600
+# UniFi network (LAN/VLAN) definitions for the network filter: same cadence.
+NETWORKS_REFRESH_SECONDS = 600
 
 # Auto-dismiss
 AUTO_DISMISS_DAYS = 7

@@ -12,6 +12,11 @@ function Dashboard() {
       <div className="page-header">
         <h2>Overview</h2>
         <p>Who is home, and at which access point</p>
+        {data.network_filter.length > 0 && (
+          <p className="muted small">
+            Network filter: {data.network_filter.join(', ')} (<a href="#/networks">change</a>)
+          </p>
+        )}
       </div>
 
       {!data.last_update_success && (
